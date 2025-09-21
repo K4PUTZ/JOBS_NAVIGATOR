@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 from typing import Callable
 import os
 
@@ -58,21 +58,37 @@ class SettingsDialog(tk.Toplevel):
         ttk.Button(auth_btns, text='Connect / Refresh', command=self._on_auth_connect).pack(side='left', padx=(0, 6))
         ttk.Button(auth_btns, text='Clear Tokens', command=self._on_auth_clear).pack(side='left', padx=(0, 6))
 
-        ttk.Label(frame, text='Favorites').grid(row=2, column=0, sticky='w', pady=(12, 4))
+        # Separator before favorites
+        ttk.Separator(frame, orient='horizontal').grid(row=2, column=0, columnspan=3, sticky='ew', pady=(8, 6))
+
+        ttk.Label(frame, text='Favorites:').grid(row=3, column=0, sticky='w', pady=(0, 6))
+
+        # Favorites table
         fav_frame = ttk.Frame(frame)
-        fav_frame.grid(row=3, column=0, columnspan=2)
+        fav_frame.grid(row=4, column=0, columnspan=3, sticky='ew')
+        # Columns: [#] [SKU/] [Relative Path] [Button Label]
+        fav_frame.columnconfigure(0, weight=0)
+        fav_frame.columnconfigure(1, weight=0)
+        fav_frame.columnconfigure(2, weight=1)
+        fav_frame.columnconfigure(3, weight=1)
+
+        # Header row
+        ttk.Label(fav_frame, text='Relative Path:').grid(row=0, column=2, sticky='w', padx=(4, 4), pady=(0, 2))
+        ttk.Label(fav_frame, text='Button Label:').grid(row=0, column=3, sticky='w', padx=(4, 0), pady=(0, 2))
+
         for idx, fav in enumerate(self._settings.favorites, start=1):
-            row = ttk.Frame(fav_frame)
-            row.pack(fill='x', pady=2)
-            ttk.Label(row, text=f'{idx}.').pack(side='left')
-            label_var = tk.StringVar(value=fav.label)
+            r = idx  # data rows start at 1
+            ttk.Label(fav_frame, text=f'{idx}.').grid(row=r, column=0, sticky='e', padx=(0, 4), pady=2)
+            ttk.Label(fav_frame, text='SKU/').grid(row=r, column=1, sticky='e', padx=(0, 4), pady=2)
             path_var = tk.StringVar(value=fav.path)
-            ttk.Entry(row, textvariable=label_var, width=20).pack(side='left', padx=(4, 4))
-            ttk.Entry(row, textvariable=path_var, width=30).pack(side='left', padx=(4, 4))
+            label_var = tk.StringVar(value=fav.label)
+            ttk.Entry(fav_frame, textvariable=path_var, width=32).grid(row=r, column=2, sticky='ew', padx=(4, 4), pady=2)
+            ttk.Entry(fav_frame, textvariable=label_var, width=24).grid(row=r, column=3, sticky='ew', padx=(4, 0), pady=2)
+            # Keep storage order (label, path) to satisfy save handler
             self._favorite_vars.append((label_var, path_var))
 
         btns = ttk.Frame(frame)
-        btns.grid(row=4, column=0, columnspan=2, pady=(12, 0))
+        btns.grid(row=5, column=0, columnspan=3, pady=(12, 0))
         ttk.Button(btns, text='Save', command=self._on_press_save).pack(side='right')
         ttk.Button(btns, text='Cancel', command=self.destroy).pack(side='right', padx=(0, 6))
 
@@ -90,9 +106,35 @@ class SettingsDialog(tk.Toplevel):
             self._working_entry.configure(state='readonly')
 
     def _on_press_save(self) -> None:
-        favorites = []
-        for label_var, path_var in self._favorite_vars:
-            favorites.append(Favorite(label=label_var.get(), path=path_var.get()))
+        favorites: list[Favorite] = []
+        # Validate favorites before saving
+        for idx, (label_var, path_var) in enumerate(self._favorite_vars, start=1):
+            label = (label_var.get() or '').strip()
+            path = (path_var.get() or '').strip()
+            # Path but no label: block save and ask user to provide a name
+            if path and not label:
+                messagebox.showerror(
+                    title='Favorite needs a name',
+                    message=(
+                        f'Favorite {idx} has a path configured but no name.\n'
+                        'Please enter a label for this shortcut.'
+                    ),
+                    parent=self,
+                )
+                return
+            # Label but no path: confirm it will open the SKU root
+            if label and not path:
+                proceed = messagebox.askyesno(
+                    title='No path set for favorite',
+                    message=(
+                        f'Favorite {idx} has a label but no path.\n'
+                        'This shortcut will open the SKU root. Do you want to continue?'
+                    ),
+                    parent=self,
+                )
+                if not proceed:
+                    return
+            favorites.append(Favorite(label=label, path=path))
         updated = Settings(
             favorites=favorites,
             working_folder=self.working_var.get() or None,

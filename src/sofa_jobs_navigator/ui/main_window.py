@@ -43,6 +43,23 @@ class MainWindow(ttk.Frame):
         # Make the middle row (console/sidebar) expand; status bar stays fixed at bottom
         self.rowconfigure(1, weight=1)
 
+        # Style: keep only the yellow accent for the current SKU value in the status bar
+        try:
+            style = ttk.Style(self)
+            # Ensure disabled label text appears gray across the app
+            try:
+                style.map('TLabel', foreground=[('disabled', '#6c757d')])
+            except Exception:
+                pass
+            # Ensure disabled button text appears dark gray
+            try:
+                style.map('TButton', foreground=[('disabled', '#6c757d')])
+            except Exception:
+                pass
+            style.configure('Sofa.SKU.TLabel', foreground='#ffc107')
+        except Exception:
+            pass
+
         console_frame = ttk.LabelFrame(self, text='Console')
         console_frame.grid(row=1, column=0, sticky='nsew', padx=(0, 12))
         console_frame.columnconfigure(0, weight=1)
@@ -71,7 +88,7 @@ class MainWindow(ttk.Frame):
         right_spacer.pack(side='left', expand=True)
         ttk.Label(status_bar, text='Current SKU:').pack(side='left')
         self._current_sku_var = tk.StringVar(value='(none)')
-        self._current_sku_label = ttk.Label(status_bar, textvariable=self._current_sku_var)
+        self._current_sku_label = ttk.Label(status_bar, textvariable=self._current_sku_var, style='Sofa.SKU.TLabel')
         self._current_sku_label.pack(side='left', padx=(6, 0))
 
         ttk.Label(sidebar, text='Favorites').pack(anchor='w')
@@ -113,14 +130,23 @@ class MainWindow(ttk.Frame):
         for idx, favorite in enumerate(self._settings.favorites, start=1):
             row = ttk.Frame(self._favorites_frame)
             row.pack(fill='x', pady=2)
-            num_lbl = tk.Label(row, text=f"{idx}.", width=3, anchor='e')
-            num_lbl.pack(side='left', padx=(0, 4))
+            # Add an F-key hint label for the first 8 favorites
+            if idx <= 8:
+                hint = ttk.Label(row, text=f"F{idx}", width=3, anchor='e')
+            else:
+                # Spacer to keep alignment for rows beyond 8
+                hint = ttk.Label(row, text="", width=3, anchor='e')
+            hint.pack(side='left', padx=(0, 6))
             label_text = favorite.label or '(empty)'
             btn = ttk.Button(row, text=label_text, command=lambda f=favorite: self._on_launch_shortcut(f.path))
             btn.pack(side='left', fill='x', expand=True)
             # Apply disabled state until a SKU is detected
             try:
-                btn.configure(state=(tk.NORMAL if self._favorites_enabled else tk.DISABLED))
+                # Disable if the favorite is not configured at all (no label and no path)
+                if not (favorite.label or favorite.path):
+                    btn.configure(state=tk.DISABLED)
+                else:
+                    btn.configure(state=(tk.NORMAL if self._favorites_enabled else tk.DISABLED))
             except Exception:
                 pass
             self._favorite_buttons.append(btn)
@@ -133,9 +159,13 @@ class MainWindow(ttk.Frame):
     def set_favorites_enabled(self, enabled: bool) -> None:
         """Enable/disable all favorite buttons and update internal flag."""
         self._favorites_enabled = bool(enabled)
-        for btn in getattr(self, '_favorite_buttons', []):
+        for idx, btn in enumerate(getattr(self, '_favorite_buttons', [])):
             try:
-                btn.configure(state=(tk.NORMAL if self._favorites_enabled else tk.DISABLED))
+                fav = self._settings.favorites[idx] if idx < len(self._settings.favorites) else None
+                if fav and not (getattr(fav, 'label', None) or getattr(fav, 'path', None)):
+                    btn.configure(state=tk.DISABLED)
+                else:
+                    btn.configure(state=(tk.NORMAL if self._favorites_enabled else tk.DISABLED))
             except Exception:
                 pass
 
@@ -270,7 +300,7 @@ class MainWindow(ttk.Frame):
 
     # =================== FAVORITES HOTKEYS ===================
     def _bind_favorite_hotkeys(self) -> None:
-        """Bind Alt/Option + digit keys to launch favorites (1..9, 0=10)."""
+        """Bind function keys F1–F8 to launch favorites 1..8."""
         top = self.winfo_toplevel()
 
         def handler_for_index(i: int):
@@ -287,19 +317,12 @@ class MainWindow(ttk.Frame):
                     pass
             return _h
 
-        # Map 1..9 to 0..8, and 0 to index 9 (10th)
-        indices = {str(d): (d - 1) for d in range(1, 10)}
-        indices['0'] = 9
-        for key, idx in indices.items():
-            h = handler_for_index(idx)
-            # Alt bindings
+        # Map F1..F8 to indices 0..7
+        for i in range(8):
+            key = f'<F{i+1}>'
+            h = handler_for_index(i)
             try:
-                top.bind_all(f'<Alt-Key-{key}>', h, add=True)
-            except Exception:
-                pass
-            # macOS Option bindings
-            try:
-                top.bind_all(f'<Option-Key-{key}>', h, add=True)
+                top.bind_all(key, h, add=True)
             except Exception:
                 pass
 

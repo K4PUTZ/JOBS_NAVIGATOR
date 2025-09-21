@@ -25,7 +25,8 @@ def make_flags(*, dry_run: bool) -> FlagSet:
 def test_defaults_loaded_when_missing(tmp_path: Path):
     manager = SettingsManager(flags=make_flags(dry_run=False), config_dir=tmp_path)
     settings = manager.load()
-    assert settings.favorites  # default shortcuts present
+    # At least 8 favorites should be present by default
+    assert len(settings.favorites) >= 8
     assert settings.recent_skus == []
 
 
@@ -40,7 +41,14 @@ def test_save_and_reload(tmp_path: Path):
     )
     manager.save(custom)
     reloaded = manager.load()
-    assert reloaded == custom
+    # Scalar fields should round-trip
+    assert reloaded.working_folder == custom.working_folder
+    assert reloaded.save_recent_skus == custom.save_recent_skus
+    assert reloaded.sounds_enabled == custom.sounds_enabled
+    assert reloaded.recent_skus == custom.recent_skus
+    # Favorites are padded to a minimum of 8 on load; the saved entries should be preserved at the start
+    assert reloaded.favorites[: len(custom.favorites)] == custom.favorites
+    assert len(reloaded.favorites) >= len(custom.favorites)
 
 
 def test_dry_run_skips_write(tmp_path: Path):

@@ -124,8 +124,8 @@ def run() -> None:
             recent_history.add(sku)
             settings_manager.save(settings)
         main_window.update_recents(recent_history.items())
-        # No secondary window; use Favorites panel or Alt/Option + digits to open a favorite
-        main_window.append_console('Choose a Favorite on the right (or use Alt/Option + number).')
+        # No secondary window; use Favorites panel or press F1–F8 to open a favorite
+        main_window.append_console('Choose a Favorite on the right (or press F1–F8).')
         last_sku = sku
         try:
             main_window.set_current_sku(sku)
