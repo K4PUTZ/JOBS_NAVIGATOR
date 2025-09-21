@@ -1,0 +1,76 @@
+"""Persistent configuration management."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import List
+
+from platformdirs import user_config_path
+
+from .flags import FlagSet, FLAGS
+from . import reference_data as ref
+
+CONFIG_APP_NAME = "sofa_jobs_navigator"
+CONFIG_FILE_NAME = "config.json"
+
+
+@dataclass
+class Favorite:
+    label: str
+    path: str
+    hotkey: str | None = None
+
+
+@dataclass
+class Settings:
+    favorites: List[Favorite] = field(default_factory=list)
+    working_folder: str | None = None
+    save_recent_skus: bool = True
+    sounds_enabled: bool = True
+    recent_skus: List[str] = field(default_factory=list)
+
+
+# =================== SETTINGS MANAGER ===================
+
+class SettingsManager:
+    def __init__(self, *, flags: FlagSet = FLAGS, config_dir: Path | None = None) -> None:
+        self._flags = flags
+        self._config_dir = config_dir or user_config_path(CONFIG_APP_NAME)
+        self._config_path = Path(self._config_dir) / CONFIG_FILE_NAME
+
+    def load(self) -> Settings:
+        if not self._config_path.exists():
+            return self._defaults()
+        with self._config_path.open('r', encoding='utf-8') as fh:
+            raw = json.load(fh)
+        favorites = [Favorite(**fav) for fav in raw.get('favorites', [])]
+        return Settings(
+            favorites=favorites,
+            working_folder=raw.get('working_folder'),
+            save_recent_skus=raw.get('save_recent_skus', True),
+            sounds_enabled=raw.get('sounds_enabled', True),
+            recent_skus=raw.get('recent_skus', []),
+        )
+
+    def save(self, settings: Settings) -> None:
+        if self._flags.config_dry_run:
+            return
+        self._config_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            'favorites': [asdict(fav) for fav in settings.favorites],
+            'working_folder': settings.working_folder,
+            'save_recent_skus': settings.save_recent_skus,
+            'sounds_enabled': settings.sounds_enabled,
+            'recent_skus': settings.recent_skus,
+        }
+        with self._config_path.open('w', encoding='utf-8') as fh:
+            json.dump(payload, fh, indent=2)
+
+    def _defaults(self) -> Settings:
+        favorites = [Favorite(label=data['label'], path=data.get('path', ''), hotkey=None) for data in ref.DEFAULT_SHORTCUTS]
+        return Settings(favorites=favorites, recent_skus=[])
+
+
+# =================== END SETTINGS MANAGER ===================

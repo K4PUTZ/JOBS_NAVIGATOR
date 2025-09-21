@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sofa-jobs-navigator"
+version = "0.1.0"
+description = "Cross-platform helper to navigate Google Drive SKU folders"
+authors = [{ name = "Sofa Ops" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "platformdirs>=3.10",
+    "pyperclip>=1.8",
+    "google-auth>=2.29",
+    "google-auth-oauthlib>=1.2",
+    "google-api-python-client>=2.130",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4",
+]
+
+[project.urls]
+Home = "https://example.com/sofa-jobs-navigator"

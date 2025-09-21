@@ -1,0 +1,141 @@
+[
+  {
+    "timestamp": "2025-09-20T15:04:22.578776",
+    "actions": [
+      "Initialized development journal",
+      "Recorded environment summary and objectives"
+    ],
+    "notes": {
+      "python_version": "396",
+      "platform": "macOS-15.6.1-arm64-64bit",
+      "cwd": "/Volumes/Expansion/----- PESSOAL -----/PYTHON"
+    }
+  },
+  {
+    "timestamp": "2025-09-20T15:05:52.459986",
+    "actions": [
+      "Defined centralized debug flag loader",
+      "Seeded reference data module with legacy shared-drive mappings"
+    ],
+    "notes": {}
+  },
+  {
+    "timestamp": "2025-09-20T15:30:07.654865",
+    "actions": [
+      "Created pytest skeleton and initial SKU tests",
+      "Implemented reusable SKU detector with debug flag integration"
+    ],
+    "notes": {
+      "flags_module": "config/flags.py",
+      "tests": "tests/test_sku.py"
+    }
+  },
+  {
+    "timestamp": "2025-09-20T15:33:18.813675",
+    "actions": [
+      "Implemented DriveClient wrapper with offline/testing hooks",
+      "Added unit tests covering drive routing and service integration"
+    ],
+    "notes": {
+      "drive_client": "src/sofa_jobs_navigator/services/drive_client.py",
+      "tests": [
+        "tests/test_drive_client.py"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-20T15:39:14.673293",
+    "actions": [
+      "Implemented settings manager with dry-run support",
+      "Added persistence tests covering defaults, save/reload, and dry-run"
+    ],
+    "notes": {
+      "settings_module": "src/sofa_jobs_navigator/config/settings.py",
+      "tests": [
+        "tests/test_settings.py"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-20T15:41:01.627821",
+    "actions": [
+      "Added event logging module with rotating file handler",
+      "Created tests ensuring debug flag behaviour and info writes"
+    ],
+    "notes": {
+      "logger": "src/sofa_jobs_navigator/logging/event_log.py",
+      "tests": [
+        "tests/test_event_log.py"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-20T16:13:55.182621",
+    "actions": [
+      "Assembled application shell (app entrypoint, UI scaffolds, hotkey manager)",
+      "Initial main window displays favorites and console",
+      "Settings dialog allows editing favorites"
+    ],
+    "notes": {
+      "app": "src/sofa_jobs_navigator/app.py",
+      "ui_main": "src/sofa_jobs_navigator/ui/main_window.py",
+      "settings_dialog": "src/sofa_jobs_navigator/ui/settings_dialog.py",
+      "hotkeys": "src/sofa_jobs_navigator/controls/hotkeys.py"
+    }
+  },
+  {
+    "timestamp": "2025-09-20T16:18:45.441538",
+    "actions": [
+      "Implemented Phase 3 enhancements: shortcut picker, sounds, clipboard helper, recents manager",
+      "Extended settings/tests to persist recent SKUs",
+      "Updated application flow to leverage new utilities"
+    ],
+    "notes": {
+      "shortcut_picker": "src/sofa_jobs_navigator/ui/shortcut_picker.py",
+      "clipboard": "src/sofa_jobs_navigator/utils/clipboard.py",
+      "sound": "src/sofa_jobs_navigator/utils/sound.py",
+      "recent_history": "src/sofa_jobs_navigator/services/recent_history.py",
+      "tests": [
+        "tests/test_recent_history.py",
+        "tests/test_clipboard.py",
+        "tests/test_sound.py"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-20T16:23:32.486502",
+    "actions": [
+      "Added README, pyproject metadata, and packaging notes",
+      "Documented dependencies, debug flags, and packaging workflow"
+    ],
+    "notes": {
+      "readme": "README.md",
+      "pyproject": "pyproject.toml",
+      "packaging_notes": "DEVELOPMENT/packaging_notes.md"
+    }
+  },
+  {
+    "timestamp": "2025-09-20T17:07:33.784385",
+    "actions": [
+      "Executed pytest suite with overrides; all tests passing"
+    ],
+    "notes": {
+      "command": "pytest tests --override-ini=python_files=test_*.py --override-ini=python_classes=Test* --override-ini=python_functions=test* --override-ini=testpaths=tests"
+    }
+  },
+  {
+    "timestamp": "2025-09-20T19:30:57.971908",
+    "actions": [
+      "Added AuthService with cached OAuth tokens",
+      "Updated settings dialog with connect/clear controls",
+      "Integrated auth flow into app entrypoint",
+      "Extended dependencies for google-auth libraries"
+    ],
+    "notes": {
+      "auth_service": "src/sofa_jobs_navigator/services/auth_service.py",
+      "settings_dialog": "src/sofa_jobs_navigator/ui/settings_dialog.py",
+      "app": "src/sofa_jobs_navigator/app.py",
+      "pyproject": "pyproject.toml"
+    }
+  }
+]
