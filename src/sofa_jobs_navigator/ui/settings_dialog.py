@@ -36,6 +36,7 @@ class SettingsDialog(tk.Toplevel):
         self._on_auth_clear = on_auth_clear
         self._current_account = current_account
         self._favorite_vars: list[tuple[tk.StringVar, tk.StringVar]] = []
+        self._account_var = tk.StringVar(value=self._format_account(self._current_account))
         self._build_ui()
         self._center_on_screen()
 
@@ -51,8 +52,7 @@ class SettingsDialog(tk.Toplevel):
         self._working_entry.grid(row=0, column=1, sticky='ew')
         ttk.Button(frame, text='Browse…', command=self._pick_working_folder).grid(row=0, column=2, padx=(6, 0))
 
-        account_text = f'Account: {self._current_account or "(unauthenticated)"}'
-        ttk.Label(frame, text=account_text).grid(row=1, column=0, sticky='w', pady=(6, 4))
+        ttk.Label(frame, textvariable=self._account_var).grid(row=1, column=0, sticky='w', pady=(6, 4))
         auth_btns = ttk.Frame(frame)
         auth_btns.grid(row=1, column=1, sticky='e', pady=(6, 4))
         ttk.Button(auth_btns, text='Connect / Refresh', command=self._on_auth_connect).pack(side='left', padx=(0, 6))
@@ -102,6 +102,17 @@ class SettingsDialog(tk.Toplevel):
         )
         self._on_save(updated)
         self.destroy()
+
+    def _format_account(self, account: str | None) -> str:
+        return f'Account: {account or "(unauthenticated)"}'
+
+    def set_account(self, account: str | None) -> None:
+        """Update the account label live (called after successful connect/clear)."""
+        try:
+            self._current_account = account
+            self._account_var.set(self._format_account(account))
+        except Exception:
+            pass
 
     def _center_on_screen(self) -> None:
         try:

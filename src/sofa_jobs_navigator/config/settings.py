@@ -46,6 +46,9 @@ class SettingsManager:
         with self._config_path.open('r', encoding='utf-8') as fh:
             raw = json.load(fh)
         favorites = [Favorite(**fav) for fav in raw.get('favorites', [])]
+        # Ensure a minimum of 8 favorites (pad with empty entries for older configs)
+        while len(favorites) < 8:
+            favorites.append(Favorite(label='', path='', hotkey=None))
         return Settings(
             favorites=favorites,
             working_folder=raw.get('working_folder'),
@@ -70,6 +73,9 @@ class SettingsManager:
 
     def _defaults(self) -> Settings:
         favorites = [Favorite(label=data['label'], path=data.get('path', ''), hotkey=None) for data in ref.DEFAULT_SHORTCUTS]
+        # Guarantee at least 8 entries even if defaults change
+        while len(favorites) < 8:
+            favorites.append(Favorite(label='', path='', hotkey=None))
         return Settings(favorites=favorites, recent_skus=[])
 
 

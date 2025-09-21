@@ -57,6 +57,7 @@ DEFAULT_SHORTCUTS = [
     {"label": "Envio Direto", "path": "EXPORT/03- ARTES/03- ENVIO DIRETO PLATAFORMA"},
     {"label": "Legendas", "path": "EXPORT/02- LEGENDAS"},
     {"label": "Temp", "path": "TEMP"},
+    {"label": "Entrega", "path": "EXPORT/04- ENTREGAS"},
 ]
 
 # =================== END REFERENCE DATA ===================

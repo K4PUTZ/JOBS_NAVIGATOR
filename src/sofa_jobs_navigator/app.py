@@ -18,7 +18,6 @@ from .services.recent_history import RecentSKUHistory
 from .services.google_drive_service import GoogleDriveService
 from .ui.main_window import MainWindow
 from .ui.settings_dialog import SettingsDialog
-from .ui.shortcut_picker import ShortcutPicker
 from .utils.clipboard import ClipboardReader
 from .utils.sku import DEFAULT_DETECTOR
 from .utils.sound import SoundPlayer
@@ -89,12 +88,6 @@ def run() -> None:
             LOGGER.warn('Path resolution failed', sku=sku, path=favorite_path)
             sound_player.play_warning()
 
-    def open_shortcut_picker(sku: str) -> None:
-        def on_pick(favorite):
-            navigate_to_favorite(sku, favorite.path)
-
-        ShortcutPicker(root, favorites=settings.favorites, on_pick=on_pick)
-
     def handle_launch(event: tk.Event | None = None) -> None:
         nonlocal last_sku
         text = clipboard.read_text()
@@ -131,12 +124,18 @@ def run() -> None:
             recent_history.add(sku)
             settings_manager.save(settings)
         main_window.update_recents(recent_history.items())
-
-        open_shortcut_picker(sku)
+        # No secondary window; use Favorites panel or Alt/Option + digits to open a favorite
+        main_window.append_console('Choose a Favorite on the right (or use Alt/Option + number).')
         last_sku = sku
+        try:
+            main_window.set_current_sku(sku)
+            main_window.set_favorites_enabled(True)
+        except Exception:
+            pass
 
     def on_open_settings() -> None:
         nonlocal settings, recent_history, last_sku, current_account
+        dialog_ref: dict[str, SettingsDialog | None] = {"dlg": None}
 
         def on_save(updated: Settings) -> None:
             nonlocal settings, recent_history
@@ -160,6 +159,13 @@ def run() -> None:
                     main_window.set_status(online=True, account=email, token_expiry_iso=expiry)
                 except Exception:
                     pass
+                # Update account label in settings dialog immediately if open
+                try:
+                    dlg = dialog_ref.get("dlg")
+                    if dlg is not None:
+                        dlg.set_account(email)
+                except Exception:
+                    pass
                 LOGGER.info('auth.connected', account=email)
             except Exception as exc:
                 main_window.append_console(f'Auth failed: {exc}')
@@ -173,9 +179,16 @@ def run() -> None:
                 main_window.set_status(online=False, account=None)
             except Exception:
                 pass
+            # Update account label in settings dialog immediately if open
+            try:
+                dlg = dialog_ref.get("dlg")
+                if dlg is not None:
+                    dlg.set_account(None)
+            except Exception:
+                pass
             LOGGER.info('auth.cleared')
 
-        SettingsDialog(
+        dialog_ref["dlg"] = SettingsDialog(
             root,
             settings=settings,
             on_save=on_save,
@@ -183,6 +196,11 @@ def run() -> None:
             on_auth_clear=on_auth_clear,
             current_account=current_account,
         )
+        # Ensure we release the dialog reference when it is destroyed
+        try:
+            dialog_ref["dlg"].bind("<Destroy>", lambda e: dialog_ref.__setitem__("dlg", None))
+        except Exception:
+            pass
 
     main_window = MainWindow(
         root,
@@ -195,11 +213,44 @@ def run() -> None:
         main_window.set_status(online=False, account=None)
     except Exception:
         pass
+    # Initialize current SKU and disable favorites until one is detected
+    try:
+        main_window.set_current_sku(None)
+        main_window.set_favorites_enabled(False)
+    except Exception:
+        pass
     main_window.append_console('Copy a SKU (Vendor-ID) to the memory and press F12.')
     main_window.update_recents(recent_history.items())
 
     hotkeys = HotkeyManager(root=root)
     hotkeys.setup_default_shortcuts(lambda event: handle_launch(event))
+
+    # Attempt to auto-connect on startup (respect offline flag)
+    def _attempt_auto_connect() -> None:
+        if FLAGS.offline_mode:
+            return
+        try:
+            creds = auth_service.ensure_authenticated()
+            email = auth_service.get_account_email(creds) or getattr(creds, 'service_account_email', None) or getattr(creds, 'client_id', None)
+            update_account_label(email)
+            # Enable online Drive service immediately
+            drive_client._service_factory = lambda: GoogleDriveService(creds)  # type: ignore[attr-defined]
+            main_window.append_console('Auto-connected to Google Drive')
+            try:
+                expiry = auth_service.get_token_expiry_iso(creds)
+                main_window.set_status(online=True, account=email, token_expiry_iso=expiry)
+            except Exception:
+                pass
+            LOGGER.info('auth.auto_connected', account=email)
+        except Exception:
+            # Stay silent on failure; user can connect manually
+            LOGGER.info('auth.auto_connect_skipped')
+
+    try:
+        # Schedule shortly after UI shows to avoid blocking initial render
+        root.after(250, _attempt_auto_connect)
+    except Exception:
+        pass
 
     root.mainloop()
 
