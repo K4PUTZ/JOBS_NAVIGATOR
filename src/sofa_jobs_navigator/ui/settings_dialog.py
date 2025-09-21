@@ -43,29 +43,37 @@ class SettingsDialog(tk.Toplevel):
     def _build_ui(self) -> None:
         frame = ttk.Frame(self, padding=12)
         frame.pack(fill='both', expand=True)
-        frame.columnconfigure(1, weight=1)
+        frame.columnconfigure(0, weight=1)
+        # Header area (packed left) to avoid grid for top elements
+        header = ttk.Frame(frame)
+        header.grid(row=0, column=0, columnspan=3, sticky='w')
 
-        ttk.Label(frame, text='Working folder:').grid(row=0, column=0, sticky='w')
+        # Working folder row
+        wf_row = ttk.Frame(header)
+        wf_row.pack(anchor='w')
+        ttk.Label(wf_row, text='Working folder:').pack(side='left')
         self.working_var = tk.StringVar(value=self._settings.working_folder or '')
-        # Read-only display of current folder + Browse button
-        self._working_entry = ttk.Entry(frame, textvariable=self.working_var, width=40, state='readonly')
-        self._working_entry.grid(row=0, column=1, sticky='ew')
-        ttk.Button(frame, text='Browse…', command=self._pick_working_folder).grid(row=0, column=2, padx=(6, 0))
+        self._working_entry = ttk.Entry(wf_row, textvariable=self.working_var, width=40, state='readonly', justify='left')
+        self._working_entry.pack(side='left', padx=(6, 6))
+        ttk.Button(wf_row, text='Browse…', command=self._pick_working_folder).pack(side='left')
 
-        ttk.Label(frame, textvariable=self._account_var).grid(row=1, column=0, sticky='w', pady=(6, 4))
-        auth_btns = ttk.Frame(frame)
-        auth_btns.grid(row=1, column=1, sticky='e', pady=(6, 4))
+        # Account row
+        acct_row = ttk.Frame(header)
+        acct_row.pack(anchor='w', pady=(6, 4))
+        ttk.Label(acct_row, textvariable=self._account_var).pack(side='left')
+        auth_btns = ttk.Frame(acct_row)
+        auth_btns.pack(side='left', padx=(12, 0))
         ttk.Button(auth_btns, text='Connect / Refresh', command=self._on_auth_connect).pack(side='left', padx=(0, 6))
         ttk.Button(auth_btns, text='Clear Tokens', command=self._on_auth_clear).pack(side='left', padx=(0, 6))
 
         # Separator before favorites
-        ttk.Separator(frame, orient='horizontal').grid(row=2, column=0, columnspan=3, sticky='ew', pady=(8, 6))
+        ttk.Separator(frame, orient='horizontal').grid(row=1, column=0, columnspan=3, sticky='ew', pady=(8, 6))
 
-        ttk.Label(frame, text='Favorites:').grid(row=3, column=0, sticky='w', pady=(0, 6))
+        ttk.Label(frame, text='Favorites:').grid(row=2, column=0, sticky='w', pady=(0, 6))
 
         # Favorites table
         fav_frame = ttk.Frame(frame)
-        fav_frame.grid(row=4, column=0, columnspan=3, sticky='ew')
+        fav_frame.grid(row=3, column=0, columnspan=3, sticky='ew')
         # Columns: [#] [SKU/] [Relative Path] [Button Label]
         fav_frame.columnconfigure(0, weight=0)
         fav_frame.columnconfigure(1, weight=0)
@@ -88,7 +96,7 @@ class SettingsDialog(tk.Toplevel):
             self._favorite_vars.append((label_var, path_var))
 
         btns = ttk.Frame(frame)
-        btns.grid(row=5, column=0, columnspan=3, pady=(12, 0))
+        btns.grid(row=4, column=0, columnspan=3, pady=(12, 0))
         ttk.Button(btns, text='Save', command=self._on_press_save).pack(side='right')
         ttk.Button(btns, text='Cancel', command=self.destroy).pack(side='right', padx=(0, 6))
 
