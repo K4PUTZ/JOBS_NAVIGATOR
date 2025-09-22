@@ -31,6 +31,7 @@ class Settings:
     sounds_enabled: bool = True
     connect_on_startup: bool = True
     recent_skus: List[str] = field(default_factory=list)
+    show_help_on_startup: bool = True
 
 
 # =================== SETTINGS MANAGER ===================
@@ -57,6 +58,7 @@ class SettingsManager:
             sounds_enabled=raw.get('sounds_enabled', True),
             connect_on_startup=raw.get('connect_on_startup', True),
             recent_skus=raw.get('recent_skus', []),
+            show_help_on_startup=raw.get('show_help_on_startup', True),
         )
 
     def save(self, settings: Settings) -> None:
@@ -70,6 +72,7 @@ class SettingsManager:
             'sounds_enabled': settings.sounds_enabled,
             'connect_on_startup': settings.connect_on_startup,
             'recent_skus': settings.recent_skus,
+            'show_help_on_startup': settings.show_help_on_startup,
         }
         with self._config_path.open('w', encoding='utf-8') as fh:
             json.dump(payload, fh, indent=2)

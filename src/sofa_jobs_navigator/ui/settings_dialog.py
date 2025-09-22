@@ -78,6 +78,14 @@ class SettingsDialog(tk.Toplevel):
         self._connect_start_var = tk.BooleanVar(value=bool(getattr(self._settings, 'connect_on_startup', True)))
         ttk.Checkbutton(prefs_row, variable=self._connect_start_var, text='On').pack(side='left', padx=(6, 0))
 
+        # Tip + reset help row
+        tip_row = ttk.Frame(header)
+        tip_row.pack(anchor='w', pady=(4, 0))
+        ttk.Label(tip_row, text='Tip: You can reset in-product help messages here.', foreground='#6c757d').pack(side='left')
+        ttk.Button(tip_row, text='Reset Welcome Screen', command=self._reset_welcome).pack(side='left', padx=(12, 0))
+        # Backing var for show_help_on_startup (also saved on Save)
+        self._show_help_var = tk.BooleanVar(value=bool(getattr(self._settings, 'show_help_on_startup', True)))
+
         # Separator before favorites
         ttk.Separator(frame, orient='horizontal').grid(row=1, column=0, columnspan=3, sticky='ew', pady=(8, 6))
 
@@ -162,6 +170,7 @@ class SettingsDialog(tk.Toplevel):
             sounds_enabled=bool(self._sounds_var.get()) if hasattr(self, '_sounds_var') else self._settings.sounds_enabled,
             connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', True),
             recent_skus=self._settings.recent_skus,
+            show_help_on_startup=bool(self._show_help_var.get()) if hasattr(self, '_show_help_var') else getattr(self._settings, 'show_help_on_startup', True),
         )
         self._on_save(updated)
         self.destroy()
@@ -187,6 +196,13 @@ class SettingsDialog(tk.Toplevel):
             x = max((sw // 2) - (w // 2), 0)
             y = max((sh // 2) - (h // 2), 0)
             self.geometry(f"{w}x{h}+{x}+{y}")
+        except Exception:
+            pass
+
+    def _reset_welcome(self) -> None:
+        try:
+            self._show_help_var.set(True)
+            messagebox.showinfo(title='Welcome Screen', message='Welcome screen will show on next start.', parent=self)
         except Exception:
             pass
 

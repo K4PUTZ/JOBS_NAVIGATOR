@@ -28,6 +28,7 @@ class MainWindow(ttk.Frame):
         on_check_clipboard: Callable[[], None] | None = None,
         on_search: Callable[[], None] | None = None,
         on_about: Callable[[], None] | None = None,
+        on_help: Callable[[], None] | None = None,
         on_create_sku_folder: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(master, padding=12)
@@ -37,6 +38,7 @@ class MainWindow(ttk.Frame):
         self._on_check_clipboard = on_check_clipboard
         self._on_search = on_search
         self._on_about = on_about
+        self._on_help = on_help
         self._on_create_sku_folder = on_create_sku_folder
         # Favorites are disabled until a SKU is detected
         self._favorites_enabled: bool = False
@@ -216,8 +218,10 @@ class MainWindow(ttk.Frame):
         # Right tools: align buttons to the right
         tools = ttk.Frame(bar)
         tools.grid(row=0, column=1, sticky='e')
-        # Create four tool buttons with vector-like glyph (font chars) + caption + keybinding
-        # 1) Check Clipboard (F9)
+        # Create tool buttons with vector-like glyph (font chars) + caption + keybinding
+        # Help (Home) first
+        self._make_tool_button(tools, icon='🏠', label='Help', key='Home', command=self._on_tool_help)
+        # Check Clipboard (F9)
         self._make_tool_button(tools, icon='📋', label='Check Clipboard', key='F9', command=self._on_tool_check_clipboard)
         # 2) About (F10)
         self._make_tool_button(tools, icon='ℹ️', label='About', key='F10', command=self._on_tool_about)
@@ -281,6 +285,15 @@ class MainWindow(ttk.Frame):
         except Exception:
             pass
         self.append_console('About dialog is under development.')
+
+    def _on_tool_help(self) -> None:
+        try:
+            if callable(self._on_help):
+                self._on_help()  # type: ignore[misc]
+                return
+        except Exception:
+            pass
+        self.append_console('Help is under development.')
 
     def _on_tool_check_clipboard(self) -> None:
         # Delegate to app to inspect clipboard and print to terminal

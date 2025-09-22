@@ -19,6 +19,7 @@ from .services.recent_history import RecentSKUHistory
 from .services.google_drive_service import GoogleDriveService
 from .ui.main_window import MainWindow
 from .ui.about_window import AboutWindow
+from .ui.welcome_window import WelcomeWindow
 from .ui.settings_dialog import SettingsDialog
 from .utils.app_icons import set_app_icon
 from .utils.clipboard import ClipboardReader
@@ -36,7 +37,7 @@ def run() -> None:
 
     root = tk.Tk()
     root.title('Sofa Jobs Navigator 1.0')
-    root.geometry('900x700')
+    root.geometry('1200x700')
     # Apply app icon (best-effort)
     try:
         set_app_icon(root)
@@ -45,7 +46,7 @@ def run() -> None:
     # Center main window on screen
     try:
         root.update_idletasks()
-        w = 900
+        w = 1200
         h = 700
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
@@ -320,6 +321,21 @@ def run() -> None:
             except Exception:
                 pass
 
+    def on_help_action() -> None:
+        def _apply_show(val: bool) -> None:
+            try:
+                settings.show_help_on_startup = bool(val)
+                settings_manager.save(settings)
+            except Exception:
+                pass
+        try:
+            WelcomeWindow(root, on_set_show_at_startup=_apply_show, initial_show_at_startup=bool(getattr(settings, 'show_help_on_startup', True)))
+        except Exception:
+            try:
+                main_window.append_console('Help is under development.')
+            except Exception:
+                pass
+
     main_window = MainWindow(
         root,
         settings=settings,
@@ -328,6 +344,7 @@ def run() -> None:
         on_check_clipboard=on_check_clipboard_action,
         on_search=on_search_action,
         on_about=on_about_action,
+        on_help=on_help_action,
         on_create_sku_folder=on_create_sku_folder,
     )
     # Ensure window is large enough to accommodate all UI elements
@@ -370,6 +387,12 @@ def run() -> None:
         pass
     main_window.console_hint('Copy a SKU (Vendor-ID) to the memory and click search or press F12.')
     main_window.update_recents(recent_history.items())
+    # Show Welcome screen on first run if enabled, after a short delay to ensure full render
+    try:
+        if bool(getattr(settings, 'show_help_on_startup', True)):
+            root.after(1000, on_help_action)
+    except Exception:
+        pass
 
     hotkeys = HotkeyManager(root=root)
     hotkeys.setup_default_shortcuts(lambda event: handle_launch(event))
@@ -378,6 +401,7 @@ def run() -> None:
         root.bind_all('<F9>', lambda e: on_check_clipboard_action(), add=True)
         root.bind_all('<F10>', lambda e: on_about_action(), add=True)
         root.bind_all('<F11>', lambda e: on_open_settings(), add=True)
+        root.bind_all('<Home>', lambda e: on_help_action(), add=True)
     except Exception:
         pass
     # Map numpad 0 to Search (same as F12)
