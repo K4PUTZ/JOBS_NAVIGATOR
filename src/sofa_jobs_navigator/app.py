@@ -18,7 +18,9 @@ from .services.drive_client import DriveClient
 from .services.recent_history import RecentSKUHistory
 from .services.google_drive_service import GoogleDriveService
 from .ui.main_window import MainWindow
+from .ui.about_window import AboutWindow
 from .ui.settings_dialog import SettingsDialog
+from .utils.app_icons import set_app_icon
 from .utils.clipboard import ClipboardReader
 from .utils.sku import DEFAULT_DETECTOR
 from .utils.sound import SoundPlayer
@@ -35,6 +37,11 @@ def run() -> None:
     root = tk.Tk()
     root.title('Sofa Jobs Navigator 1.0')
     root.geometry('900x700')
+    # Apply app icon (best-effort)
+    try:
+        set_app_icon(root)
+    except Exception:
+        pass
     # Center main window on screen
     try:
         root.update_idletasks()
@@ -250,8 +257,13 @@ def run() -> None:
         handle_launch(None)
 
     def on_about_action() -> None:
-        # Placeholder for future about dialog
-        main_window.append_console('About dialog is under development.')
+        try:
+            AboutWindow(root)
+        except Exception:
+            try:
+                main_window.append_console('About dialog is under development.')
+            except Exception:
+                pass
 
     main_window = MainWindow(
         root,
