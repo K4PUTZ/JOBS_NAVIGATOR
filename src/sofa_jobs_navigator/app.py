@@ -307,7 +307,7 @@ def run() -> None:
         main_window.set_favorites_enabled(False)
     except Exception:
         pass
-    main_window.console_warning('Copy a SKU (Vendor-ID) to the memory and press F12.')
+    main_window.console_hint('Copy a SKU (Vendor-ID) to the memory and click search or press F12.')
     main_window.update_recents(recent_history.items())
 
     hotkeys = HotkeyManager(root=root)

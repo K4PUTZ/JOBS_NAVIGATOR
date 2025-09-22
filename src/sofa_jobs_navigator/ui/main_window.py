@@ -97,6 +97,8 @@ class MainWindow(ttk.Frame):
             self.console_text.tag_configure('error', foreground='#dc3545')    # red
             self.console_text.tag_configure('warning', foreground='#ffc107')  # yellow
             self.console_text.tag_configure('sku', foreground='#0dcaf0')      # cyan
+            # Hint/prompt messages: pink
+            self.console_text.tag_configure('hint', foreground='#ff69b4')     # pink (hot pink)
         except Exception:
             pass
 
@@ -125,25 +127,36 @@ class MainWindow(ttk.Frame):
 
         ttk.Label(sidebar, text='Favorites').pack(anchor='w')
         self._favorites_frame = ttk.Frame(sidebar)
+        # Use grid inside favorites so labels/buttons align across rows
         self._favorites_frame.pack(fill='x', pady=(2, 12))
+        try:
+            self._favorites_frame.grid_columnconfigure(0, weight=0)
+            self._favorites_frame.grid_columnconfigure(1, weight=1, uniform='fav')
+        except Exception:
+            pass
         self._favorite_buttons: list[ttk.Button] = []
         self._render_favorites()
 
         ttk.Label(sidebar, text='Recent SKUs').pack(anchor='w')
         # Recent SKUs: up to 7 copy buttons with dark tooltips
         self._recents_rows = ttk.Frame(sidebar)
+        # Use grid inside recents so labels/buttons align across rows
         self._recents_rows.pack(fill='x', pady=(2, 0))
+        try:
+            self._recents_rows.grid_columnconfigure(0, weight=0)
+            self._recents_rows.grid_columnconfigure(1, weight=1, uniform='rec')
+        except Exception:
+            pass
         self._recent_buttons: list[ttk.Button] = []
         self._recent_tooltips: list[_Tooltip] = []
         self._recent_full_values: list[str] = [""] * 7
         for i in range(7):
-            row = ttk.Frame(self._recents_rows)
-            row.pack(fill='x', pady=1)
-            # Index label like (1), (2), ...
-            idx_lbl = ttk.Label(row, text=f"({i+1})", width=4, anchor='e')
-            idx_lbl.pack(side='left', padx=(0, 6))
-            btn = ttk.Button(row, text='⧉ (empty)', width=30, command=lambda idx=i: self._on_recent_click(idx))
-            btn.pack(side='left', fill='x', expand=True)
+            # Index label like (1), (2), ... (fixed width, right-aligned)
+            idx_lbl = ttk.Label(self._recents_rows, text=f"({i+1})", width=4, anchor='e')
+            idx_lbl.grid(row=i, column=0, sticky='e', padx=(0, 6), pady=(1, 1))
+            # Button expands to fill column 1; all buttons share width via grid
+            btn = ttk.Button(self._recents_rows, text='⧉ (empty)', command=lambda idx=i: self._on_recent_click(idx))
+            btn.grid(row=i, column=1, sticky='ew', pady=(1, 1))
             tip = _Tooltip(btn, text='No recent SKU', bg='#333333', fg='#ffffff')
             self._recent_buttons.append(btn)
             self._recent_tooltips.append(tip)
@@ -266,20 +279,22 @@ class MainWindow(ttk.Frame):
             except Exception:
                 pass
         self._favorite_buttons.clear()
-        # Rebuild with number labels 1..N
-        for idx, favorite in enumerate(self._settings.favorites, start=1):
-            row = ttk.Frame(self._favorites_frame)
-            row.pack(fill='x', pady=2)
+        # Ensure grid columns are configured (idempotent)
+        try:
+            self._favorites_frame.grid_columnconfigure(0, weight=0)
+            self._favorites_frame.grid_columnconfigure(1, weight=1, uniform='fav')
+        except Exception:
+            pass
+        # Rebuild with number labels 1..N using grid for consistent alignment
+        for r, favorite in enumerate(self._settings.favorites):
+            idx = r + 1
             # Add an F-key hint label for the first 8 favorites
-            if idx <= 8:
-                hint = ttk.Label(row, text=f"F{idx}", width=3, anchor='e')
-            else:
-                # Spacer to keep alignment for rows beyond 8
-                hint = ttk.Label(row, text="", width=3, anchor='e')
-            hint.pack(side='left', padx=(0, 6))
+            hint_text = f"F{idx}" if idx <= 8 else ""
+            hint = ttk.Label(self._favorites_frame, text=hint_text, width=4, anchor='e')
+            hint.grid(row=r, column=0, sticky='e', padx=(0, 6), pady=(1, 1))
             label_text = favorite.label or '(empty)'
-            btn = ttk.Button(row, text=label_text, command=lambda f=favorite: self._on_launch_shortcut(f.path))
-            btn.pack(side='left', fill='x', expand=True)
+            btn = ttk.Button(self._favorites_frame, text=label_text, command=lambda f=favorite: self._on_launch_shortcut(f.path))
+            btn.grid(row=r, column=1, sticky='ew', pady=(1, 1))
             # Apply disabled state until a SKU is detected
             try:
                 # Disable if the favorite is not configured at all (no label and no path)
@@ -375,6 +390,9 @@ class MainWindow(ttk.Frame):
 
     def console_sku_detected(self, sku: str) -> None:
         self.append_console_highlight(f'SKU detected: {sku}', highlight=sku, highlight_tag='sku')
+
+    def console_hint(self, message: str) -> None:
+        self.append_console(message, 'hint')
 
     def update_recents(self, recents: Iterable[str]) -> None:
         """Populate the recent SKU buttons.
