@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from tkinter import messagebox
 import os
 import subprocess
 import webbrowser
@@ -33,12 +34,12 @@ def run() -> None:
 
     root = tk.Tk()
     root.title('Sofa Jobs Navigator 1.0')
-    root.geometry('900x600')
+    root.geometry('900x700')
     # Center main window on screen
     try:
         root.update_idletasks()
         w = 900
-        h = 600
+        h = 700
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
         x = max((sw // 2) - (w // 2), 0)
@@ -64,16 +65,16 @@ def run() -> None:
 
     def navigate_to_favorite(sku: str, favorite_path: str) -> None:
         if not sku or sku == '(unknown)':
-            main_window.append_console('No SKU context yet. Press F12 after copying a SKU.')
+            main_window.console_warning('No SKU context yet. Press F12 after copying a SKU.')
             sound_player.play_warning()
             return
         try:
             result = drive_client.resolve_relative_path(sku, favorite_path)
             LOGGER.info('Resolved path', sku=sku, path=favorite_path, folder_id=result.folder_id)
-            main_window.append_console(f"Resolved path '{favorite_path or '(root)'}' -> {result.folder_id}")
+            main_window.console_success(f"Resolved path '{favorite_path or '(root)'}' -> {result.folder_id}")
             # Build Google Drive URL and open in the default browser
             url = f"https://drive.google.com/drive/folders/{result.folder_id}"
-            main_window.append_console(f"Opening in browser: {url}")
+            main_window.console_success(f"Opening in browser: {url}")
             try:
                 opened = webbrowser.open(url, new=2)
                 if not opened:
@@ -89,7 +90,7 @@ def run() -> None:
                 pass
             sound_player.play_success()
         except LookupError as exc:
-            main_window.append_console(str(exc))
+            main_window.console_error(str(exc))
             LOGGER.warn('Path resolution failed', sku=sku, path=favorite_path)
             sound_player.play_warning()
 
@@ -110,19 +111,22 @@ def run() -> None:
                 except Exception:
                     pass
             except Exception as exc:
-                main_window.append_console(f'Auth failed: {exc}')
+                main_window.console_error(f'Auth failed: {exc}')
                 LOGGER.error('auth.failed', error=str(exc))
                 sound_player.play_warning()
                 return
         sku_result = DEFAULT_DETECTOR.find_first(text)
         if not sku_result:
-            main_window.append_console('No SKU found in clipboard.')
+            main_window.console_warning('No SKU found in clipboard.')
             LOGGER.warn('SKU missing from clipboard')
             sound_player.play_warning()
             return
 
         sku = sku_result.sku
-        main_window.append_console(f'SKU detected: {sku}')
+        try:
+            main_window.console_sku_detected(sku)
+        except Exception:
+            main_window.append_console(f'SKU detected: {sku}')
         LOGGER.info('SKU detected', sku=sku)
 
         if settings.save_recent_skus:
@@ -130,7 +134,7 @@ def run() -> None:
             settings_manager.save(settings)
         main_window.update_recents(recent_history.items())
         # No secondary window; use Favorites panel or press F1–F8 to open a favorite
-        main_window.append_console('Choose a Favorite on the right (or press F1–F8).')
+        main_window.console_success('Choose a Favorite on the right (or press F1–F8).')
         last_sku = sku
         try:
             main_window.set_current_sku(sku)
@@ -163,7 +167,7 @@ def run() -> None:
                 update_account_label(email)
                 # Enable online Drive service immediately
                 drive_client._service_factory = lambda: GoogleDriveService(creds)  # type: ignore[attr-defined]
-                main_window.append_console('Connected to Google Drive.')
+                main_window.console_success('Connected to Google Drive.')
                 try:
                     expiry = auth_service.get_token_expiry_iso(creds)
                     main_window.set_status(online=True, account=email, token_expiry_iso=expiry)
@@ -178,13 +182,13 @@ def run() -> None:
                     pass
                 LOGGER.info('auth.connected', account=email)
             except Exception as exc:
-                main_window.append_console(f'Auth failed: {exc}')
+                main_window.console_error(f'Auth failed: {exc}')
                 LOGGER.error('auth.failed', error=str(exc))
 
         def on_auth_clear() -> None:
             auth_service.clear_tokens()
             update_account_label(None)
-            main_window.append_console('Cleared stored credentials.')
+            main_window.console_success('Cleared stored credentials.')
             try:
                 main_window.set_status(online=False, account=None)
             except Exception:
@@ -212,12 +216,74 @@ def run() -> None:
         except Exception:
             pass
 
+    def on_check_clipboard_action() -> None:
+        # Output SKU detection results into the UI console
+        txt = clipboard.read_text()
+        results = DEFAULT_DETECTOR.find_all(txt or '')
+        try:
+            main_window.append_console('--- Clipboard SKU scan ---')
+            if not results:
+                main_window.console_warning('No SKU found.')
+                try:
+                    sound_player.play_warning()
+                except Exception:
+                    pass
+            else:
+                for r in results:
+                    try:
+                        main_window.append_console_highlight(
+                            f"SKU: {r.sku}  @[{r.start}:{r.end}]  context='{r.context}'",
+                            highlight=r.sku,
+                            highlight_tag='sku'
+                        )
+                    except Exception:
+                        main_window.append_console(f"SKU: {r.sku}  @[{r.start}:{r.end}]  context='{r.context}'")
+                try:
+                    sound_player.play_success()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def on_search_action() -> None:
+        # Invoke the same logic as the F12 launcher
+        handle_launch(None)
+
+    def on_about_action() -> None:
+        # Placeholder for future about dialog
+        main_window.append_console('About dialog is under development.')
+
     main_window = MainWindow(
         root,
         settings=settings,
         on_launch_shortcut=lambda path: navigate_to_favorite(last_sku or '(unknown)', path),
         on_open_settings=on_open_settings,
+        on_check_clipboard=on_check_clipboard_action,
+        on_search=on_search_action,
+        on_about=on_about_action,
     )
+    # Ensure window is large enough to accommodate all UI elements
+    try:
+        root.update_idletasks()
+        req_w = root.winfo_reqwidth()
+        req_h = root.winfo_reqheight()
+        cur_w = root.winfo_width()
+        cur_h = root.winfo_height()
+        if req_h > cur_h or req_w > cur_w:
+            new_w = max(cur_w, req_w)
+            new_h = max(cur_h, req_h)
+            sw = root.winfo_screenwidth()
+            sh = root.winfo_screenheight()
+            x = max((sw // 2) - (new_w // 2), 0)
+            y = max((sh // 2) - (new_h // 2), 0)
+            root.geometry(f"{new_w}x{new_h}+{x}+{y}")
+        # Set minimum size so layout doesn't clip if user resizes smaller
+        try:
+            root.minsize(width=root.winfo_width(), height=root.winfo_height())
+        except Exception:
+            pass
+    except Exception:
+        pass
     # Initialize status bar
     try:
         main_window.set_status(online=False, account=None)
@@ -229,11 +295,23 @@ def run() -> None:
         main_window.set_favorites_enabled(False)
     except Exception:
         pass
-    main_window.append_console('Copy a SKU (Vendor-ID) to the memory and press F12.')
+    main_window.console_warning('Copy a SKU (Vendor-ID) to the memory and press F12.')
     main_window.update_recents(recent_history.items())
 
     hotkeys = HotkeyManager(root=root)
     hotkeys.setup_default_shortcuts(lambda event: handle_launch(event))
+    # Extra toolbar hotkeys: F9 (check clipboard), F10 (about), F11 (settings)
+    try:
+        root.bind_all('<F9>', lambda e: on_check_clipboard_action(), add=True)
+        root.bind_all('<F10>', lambda e: on_about_action(), add=True)
+        root.bind_all('<F11>', lambda e: on_open_settings(), add=True)
+    except Exception:
+        pass
+    # Map numpad 0 to Search (same as F12)
+    try:
+        root.bind_all('<KP_0>', lambda e: on_search_action(), add=True)
+    except Exception:
+        pass
 
     # Attempt to auto-connect on startup (respect offline flag)
     def _attempt_auto_connect() -> None:
@@ -252,13 +330,90 @@ def run() -> None:
             update_account_label(email)
             # Enable online Drive service immediately
             drive_client._service_factory = lambda: GoogleDriveService(creds)  # type: ignore[attr-defined]
-            main_window.append_console('Auto-connected to Google Drive')
+            main_window.console_success('Auto-connected to Google Drive')
             try:
                 expiry = auth_service.get_token_expiry_iso(creds)
                 main_window.set_status(online=True, account=email, token_expiry_iso=expiry)
             except Exception:
                 pass
             LOGGER.info('auth.auto_connected', account=email)
+            # After successful auto-connect, perform a clipboard check by default
+            try:
+                txt = clipboard.read_text()
+            except Exception:
+                txt = ''
+            results = []
+            try:
+                results = DEFAULT_DETECTOR.find_all(txt or '')
+            except Exception:
+                results = []
+            try:
+                if not results:
+                    main_window.console_warning('No SKU found in clipboard after auto-connect.')
+                else:
+                    # Inform user about findings
+                    if len(results) == 1:
+                        main_window.console_success('Auto-connect clipboard check: 1 SKU found. Running search...')
+                    else:
+                        main_window.console_warning(f'Auto-connect clipboard check: {len(results)} SKUs found. Using the first; you can load others to Recents.')
+                    # Autosearch using the first SKU
+                    try:
+                        # Set clipboard to the first SKU so handle_launch picks it
+                        first_sku = results[0].sku
+                        try:
+                            # Ensure UI clipboard updated
+                            root.clipboard_clear()
+                            root.clipboard_append(first_sku)
+                            root.update_idletasks()
+                        except Exception:
+                            pass
+                        # Also set current SKU visual hint early (best-effort)
+                        try:
+                            main_window.set_current_sku(first_sku)
+                        except Exception:
+                            pass
+                        handle_launch(None)
+                    except Exception:
+                        pass
+                    # If more than one, ask to load up to first 7 into recents (preserve order)
+                    if len(results) > 1:
+                        try:
+                            ok = messagebox.askyesno(
+                                title='Load Recents',
+                                message='Load the first seven found SKUs into Recents?'
+                            )
+                        except Exception:
+                            ok = False
+                        if ok:
+                            try:
+                                found_skus = [r.sku for r in results]
+                                # Ensure uniqueness while preserving order
+                                seen = set()
+                                unique_skus: list[str] = []
+                                for s in found_skus:
+                                    if s not in seen:
+                                        seen.add(s)
+                                        unique_skus.append(s)
+                                # Keep first up to 7; ensure the first one (already searched) is included at the head
+                                to_add = unique_skus[:7]
+                                # Populate recent history accordingly (most recent first semantics)
+                                # We'll add in reverse so that the first remains the most recent
+                                for sku in reversed(to_add):
+                                    try:
+                                        recent_history.add(sku)
+                                    except Exception:
+                                        pass
+                                # Persist and refresh
+                                try:
+                                    settings_manager.save(settings)
+                                except Exception:
+                                    pass
+                                main_window.update_recents(recent_history.items())
+                                main_window.console_success('Loaded found SKUs into Recents.')
+                            except Exception:
+                                pass
+            except Exception:
+                pass
         except Exception:
             # Stay silent on failure; user can connect manually
             LOGGER.info('auth.auto_connect_skipped')
