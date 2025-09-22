@@ -69,3 +69,37 @@ class GoogleDriveService(DriveServiceProtocol):
                 return None
             current = files[0]["id"]
         return current
+
+    def ensure_child_folder(
+        self, *, shared_drive_id: str, parent_id: str, name: str
+    ) -> Optional[str]:
+        name = (name or "").strip()
+        if not name:
+            return None
+        # First try to find existing
+        q = f"name = '{name}' and mimeType = '{FOLDER_MIME}' and '{parent_id}' in parents"
+        resp = self._svc.files().list(
+            q=q,
+            corpora="drive",
+            driveId=shared_drive_id,
+            includeItemsFromAllDrives=True,
+            supportsAllDrives=True,
+            fields="files(id,name)",
+            pageSize=10,
+        ).execute()
+        files = resp.get("files", [])
+        if files:
+            return files[0]["id"]
+        # Create if missing
+        body = {
+            "name": name,
+            "mimeType": FOLDER_MIME,
+            "parents": [parent_id],
+            "driveId": shared_drive_id,
+        }
+        created = self._svc.files().create(
+            body=body,
+            fields="id",
+            supportsAllDrives=True,
+        ).execute()
+        return created.get("id")

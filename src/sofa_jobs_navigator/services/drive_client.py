@@ -25,6 +25,15 @@ class DriveServiceProtocol(Protocol):
     ) -> Optional[str]:
         ...
 
+    def ensure_child_folder(
+        self, *, shared_drive_id: str, parent_id: str, name: str
+    ) -> Optional[str]:
+        """Return ID of a child folder with ``name`` under ``parent_id``; create if missing.
+
+        Should be idempotent: if a folder already exists with the exact name, return its ID.
+        """
+        ...
+
 
 @dataclass
 class DriveLookupResult:
@@ -125,6 +134,46 @@ class DriveClient:
             shared_drive_id=root.shared_drive_id,
             folder_id=folder_id,
             path='/'.join(segments),
+        )
+
+    def create_child_folder(self, sku: str, parent_relative_path: Optional[str], name: str) -> DriveLookupResult:
+        """Create (or get) a child folder named ``name`` under the given relative path.
+
+        When offline, returns a synthetic folder ID incorporating the path.
+        """
+        if not name:
+            raise ValueError("Folder name is required")
+        # Locate parent
+        parent_path = (parent_relative_path or '').strip().strip('/')
+        parent = self.resolve_relative_path(sku, parent_path)
+
+        # Offline behavior: synthesize an ID and path
+        if self._flags.offline_mode or self._service_factory is None:
+            full_path = '/'.join(filter(None, [parent.path, name]))
+            folder_id = f"{parent.folder_id}/{name}"
+            self._debug(f"Offline ensure folder => {folder_id}")
+            return DriveLookupResult(
+                sku=sku,
+                shared_drive_id=parent.shared_drive_id,
+                folder_id=folder_id,
+                path=full_path,
+            )
+
+        # Online: ensure/create via service
+        service = self._get_service()
+        folder_id = service.ensure_child_folder(
+            shared_drive_id=parent.shared_drive_id,
+            parent_id=parent.folder_id,
+            name=name,
+        )
+        if not folder_id:
+            raise LookupError(f"Failed to create or locate folder '{name}' under '{parent.path or '/'}'")
+        full_path = '/'.join(filter(None, [parent.path, name]))
+        return DriveLookupResult(
+            sku=sku,
+            shared_drive_id=parent.shared_drive_id,
+            folder_id=folder_id,
+            path=full_path,
         )
 
     # =================== INTERNAL HELPERS ===================

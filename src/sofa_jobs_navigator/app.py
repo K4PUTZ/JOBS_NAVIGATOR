@@ -149,6 +149,56 @@ def run() -> None:
         except Exception:
             pass
 
+    def on_create_sku_folder(suffix: str) -> None:
+        """Create a local folder under the configured Working Folder named 'SKU + suffix'."""
+        # Gather current SKU
+        sku = main_window.get_current_sku()
+        if not sku:
+            main_window.console_warning('No SKU set. Press F12 after copying a SKU.')
+            try:
+                sound_player.play_warning()
+            except Exception:
+                pass
+            return
+        # Resolve working folder from settings
+        base_dir = (getattr(settings, 'working_folder', None) or '').strip()
+        if not base_dir:
+            main_window.console_warning('Working Folder is not set. Open Settings and choose a local folder.')
+            try:
+                sound_player.play_warning()
+            except Exception:
+                pass
+            return
+        # Sanitize folder name slightly for filesystem
+        raw_name = f"{sku}{suffix or ''}"
+        name = ''.join(ch for ch in raw_name if ch not in '\\/:*?"<>|')
+        try:
+            from pathlib import Path
+            path = Path(base_dir) / name
+            path.mkdir(parents=True, exist_ok=True)
+            main_window.console_success(f"Created local folder: {path}")
+            # Update Working Folder label to reflect settings value (already shown) and play sound
+            try:
+                sound_player.play_success()
+            except Exception:
+                pass
+            # Open in system file browser
+            try:
+                if sys.platform == 'darwin':
+                    subprocess.run(['open', str(path)], check=False)
+                elif os.name == 'nt':
+                    subprocess.run(['explorer', str(path)], shell=True, check=False)
+                else:
+                    subprocess.run(['xdg-open', str(path)], check=False)
+            except Exception:
+                pass
+        except Exception as exc:
+            main_window.console_error(f"Create local folder failed: {exc}")
+            try:
+                sound_player.play_warning()
+            except Exception:
+                pass
+
     def on_open_settings() -> None:
         nonlocal settings, recent_history, last_sku, current_account
         dialog_ref: dict[str, SettingsDialog | None] = {"dlg": None}
@@ -160,6 +210,11 @@ def run() -> None:
             recent_history = RecentSKUHistory(settings)
             main_window.refresh_favorites(settings)
             main_window.update_recents(recent_history.items())
+            # Reflect working folder from saved settings
+            try:
+                main_window.set_working_folder(settings.working_folder)
+            except Exception:
+                pass
             # Apply toggles immediately
             try:
                 sound_player.set_enabled(bool(getattr(settings, 'sounds_enabled', True)))
@@ -273,6 +328,7 @@ def run() -> None:
         on_check_clipboard=on_check_clipboard_action,
         on_search=on_search_action,
         on_about=on_about_action,
+        on_create_sku_folder=on_create_sku_folder,
     )
     # Ensure window is large enough to accommodate all UI elements
     try:
@@ -305,6 +361,11 @@ def run() -> None:
     try:
         main_window.set_current_sku(None)
         main_window.set_favorites_enabled(False)
+    except Exception:
+        pass
+    # Reflect Working Folder from settings at startup
+    try:
+        main_window.set_working_folder(settings.working_folder)
     except Exception:
         pass
     main_window.console_hint('Copy a SKU (Vendor-ID) to the memory and click search or press F12.')

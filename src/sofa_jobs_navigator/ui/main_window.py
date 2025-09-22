@@ -28,6 +28,7 @@ class MainWindow(ttk.Frame):
         on_check_clipboard: Callable[[], None] | None = None,
         on_search: Callable[[], None] | None = None,
         on_about: Callable[[], None] | None = None,
+        on_create_sku_folder: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(master, padding=12)
         self._settings = settings
@@ -36,6 +37,7 @@ class MainWindow(ttk.Frame):
         self._on_check_clipboard = on_check_clipboard
         self._on_search = on_search
         self._on_about = on_about
+        self._on_create_sku_folder = on_create_sku_folder
         # Favorites are disabled until a SKU is detected
         self._favorites_enabled: bool = False
         self._build_ui()
@@ -124,6 +126,25 @@ class MainWindow(ttk.Frame):
         self._current_sku_var = tk.StringVar(value='(none)')
         self._current_sku_label = ttk.Label(status_bar, textvariable=self._current_sku_var, style='Sofa.SKU.TLabel')
         self._current_sku_label.pack(side='left', padx=(6, 0))
+
+        # Working folder info and actions
+        # Small spacer before the working folder section
+        ttk.Frame(status_bar, width=12).pack(side='left')
+        ttk.Label(status_bar, text='Working Folder:').pack(side='left')
+        self._working_folder_var = tk.StringVar(value='(none)')
+        self._working_folder_label = ttk.Label(status_bar, textvariable=self._working_folder_var)
+        self._working_folder_label.pack(side='left', padx=(6, 0))
+        # Button: Create SKU folder
+        ttk.Frame(status_bar, width=12).pack(side='left')
+        self._create_btn = ttk.Button(status_bar, text='Create SKU folder', command=self._on_click_create_sku_folder)
+        self._create_btn.pack(side='left')
+        # Suffix label and entry
+        ttk.Label(status_bar, text=' + Suffix ').pack(side='left', padx=(8, 0))
+        self._suffix_var = tk.StringVar(value=' - FTR ')
+        self._suffix_entry = ttk.Entry(status_bar, textvariable=self._suffix_var, width=12)
+        self._suffix_entry.pack(side='left')
+        # Right margin padding
+        ttk.Frame(status_bar, width=8).pack(side='right')
 
         ttk.Label(sidebar, text='Favorites').pack(anchor='w')
         self._favorites_frame = ttk.Frame(sidebar)
@@ -332,6 +353,34 @@ class MainWindow(ttk.Frame):
         except Exception:
             pass
 
+    def get_current_sku(self) -> str | None:
+        """Return the current SKU string or None when not set."""
+        try:
+            v = (self._current_sku_var.get() or '').strip()
+            return v or None
+        except Exception:
+            return None
+
+    # Working folder helpers
+    def set_working_folder(self, folder: str | None) -> None:
+        value = (folder or '').strip() or '(none)'
+        try:
+            self._working_folder_var.set(value)
+        except Exception:
+            pass
+
+    def get_working_folder(self) -> str:
+        try:
+            return self._working_folder_var.get()
+        except Exception:
+            return '(none)'
+
+    def get_suffix_text(self) -> str:
+        try:
+            return self._suffix_var.get()
+        except Exception:
+            return ''
+
     # =================== CONSOLE HELPERS ===================
     def append_console(self, message: str, tag: str | None = None) -> None:
         """Append a line to the console, optionally with a color tag.
@@ -484,6 +533,22 @@ class MainWindow(ttk.Frame):
             tw.after(max(200, duration_ms), tw.destroy)
         except Exception:
             pass
+
+    def _on_click_create_sku_folder(self) -> None:
+        suffix = ''
+        try:
+            suffix = (self._suffix_var.get() or '').strip()
+        except Exception:
+            pass
+        # Delegate to app if available
+        try:
+            if callable(self._on_create_sku_folder):
+                self._on_create_sku_folder(suffix)  # type: ignore[misc]
+                return
+        except Exception:
+            pass
+        # Fallback: notify in console
+        self.append_console('Create SKU folder invoked (no handler wired).')
 
     # Hotkeys intentionally not bound; recents are mouse/touch only
     def _bind_recent_hotkeys(self) -> None:
