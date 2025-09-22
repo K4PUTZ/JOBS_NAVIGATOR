@@ -29,6 +29,7 @@ class Settings:
     working_folder: str | None = None
     save_recent_skus: bool = True
     sounds_enabled: bool = True
+    connect_on_startup: bool = True
     recent_skus: List[str] = field(default_factory=list)
 
 
@@ -54,6 +55,7 @@ class SettingsManager:
             working_folder=raw.get('working_folder'),
             save_recent_skus=raw.get('save_recent_skus', True),
             sounds_enabled=raw.get('sounds_enabled', True),
+            connect_on_startup=raw.get('connect_on_startup', True),
             recent_skus=raw.get('recent_skus', []),
         )
 
@@ -66,6 +68,7 @@ class SettingsManager:
             'working_folder': settings.working_folder,
             'save_recent_skus': settings.save_recent_skus,
             'sounds_enabled': settings.sounds_enabled,
+            'connect_on_startup': settings.connect_on_startup,
             'recent_skus': settings.recent_skus,
         }
         with self._config_path.open('w', encoding='utf-8') as fh:

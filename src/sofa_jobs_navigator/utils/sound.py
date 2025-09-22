@@ -14,6 +14,11 @@ class SoundPlayer:
     def __init__(self, *, flags: FlagSet = FLAGS) -> None:
         self._flags = flags
         self._system = platform.system()
+        self._enabled = True
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Enable or disable sound playback at runtime."""
+        self._enabled = bool(enabled)
 
     def play_success(self) -> None:
         self._play('success')
@@ -22,7 +27,7 @@ class SoundPlayer:
         self._play('warning')
 
     def _play(self, sound_type: str) -> None:
-        if self._flags.mute_sounds:
+        if self._flags.mute_sounds or not self._enabled:
             return
         try:
             if self._system == 'Darwin':

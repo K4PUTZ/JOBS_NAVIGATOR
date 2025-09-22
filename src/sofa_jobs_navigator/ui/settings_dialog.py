@@ -66,6 +66,18 @@ class SettingsDialog(tk.Toplevel):
         ttk.Button(auth_btns, text='Connect / Refresh', command=self._on_auth_connect).pack(side='left', padx=(0, 6))
         ttk.Button(auth_btns, text='Clear Tokens', command=self._on_auth_clear).pack(side='left', padx=(0, 6))
 
+        # Preferences row: Sounds on/off and Connect on Startup
+        prefs_row = ttk.Frame(header)
+        prefs_row.pack(anchor='w', pady=(2, 6))
+        # Sounds toggle
+        ttk.Label(prefs_row, text='Sounds:').pack(side='left')
+        self._sounds_var = tk.BooleanVar(value=bool(self._settings.sounds_enabled))
+        ttk.Checkbutton(prefs_row, variable=self._sounds_var, text='On').pack(side='left', padx=(6, 12))
+        # Connect on startup toggle
+        ttk.Label(prefs_row, text='Connect on Startup:').pack(side='left')
+        self._connect_start_var = tk.BooleanVar(value=bool(getattr(self._settings, 'connect_on_startup', True)))
+        ttk.Checkbutton(prefs_row, variable=self._connect_start_var, text='On').pack(side='left', padx=(6, 0))
+
         # Separator before favorites
         ttk.Separator(frame, orient='horizontal').grid(row=1, column=0, columnspan=3, sticky='ew', pady=(8, 6))
 
@@ -147,7 +159,8 @@ class SettingsDialog(tk.Toplevel):
             favorites=favorites,
             working_folder=self.working_var.get() or None,
             save_recent_skus=self._settings.save_recent_skus,
-            sounds_enabled=self._settings.sounds_enabled,
+            sounds_enabled=bool(self._sounds_var.get()) if hasattr(self, '_sounds_var') else self._settings.sounds_enabled,
+            connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', True),
             recent_skus=self._settings.recent_skus,
         )
         self._on_save(updated)

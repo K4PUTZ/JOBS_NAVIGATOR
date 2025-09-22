@@ -51,6 +51,11 @@ def run() -> None:
     drive_client = DriveClient()
     clipboard = ClipboardReader(tk_root=root)
     sound_player = SoundPlayer()
+    # Apply initial sound setting
+    try:
+        sound_player.set_enabled(bool(getattr(settings, 'sounds_enabled', True)))
+    except Exception:
+        pass
     current_account: str | None = None
 
     def update_account_label(account: str | None) -> None:
@@ -144,6 +149,11 @@ def run() -> None:
             recent_history = RecentSKUHistory(settings)
             main_window.refresh_favorites(settings)
             main_window.update_recents(recent_history.items())
+            # Apply toggles immediately
+            try:
+                sound_player.set_enabled(bool(getattr(settings, 'sounds_enabled', True)))
+            except Exception:
+                pass
             LOGGER.info('Settings saved via dialog')
 
         def on_auth_connect() -> None:
@@ -229,6 +239,13 @@ def run() -> None:
     def _attempt_auto_connect() -> None:
         if FLAGS.offline_mode:
             return
+        # Respect user setting for auto-connect; default ON
+        try:
+            if not bool(getattr(settings, 'connect_on_startup', True)):
+                LOGGER.info('auth.auto_connect_disabled_by_setting')
+                return
+        except Exception:
+            pass
         try:
             creds = auth_service.ensure_authenticated()
             email = auth_service.get_account_email(creds) or getattr(creds, 'service_account_email', None) or getattr(creds, 'client_id', None)
