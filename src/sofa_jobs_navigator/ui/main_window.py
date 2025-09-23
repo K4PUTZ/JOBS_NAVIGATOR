@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Iterable
+import re
 
 from ..config.settings import Settings
 from ..config.flags import FLAGS
@@ -95,6 +96,11 @@ class MainWindow(ttk.Frame):
         console_frame.rowconfigure(0, weight=1)
         self.console_text = tk.Text(console_frame, height=12, wrap='word', state='disabled')
         self.console_text.grid(row=0, column=0, sticky='nsew')
+        # Default console colors: white text on dark background; caret visible
+        try:
+            self.console_text.configure(bg='#1e1e1e', fg='#ffffff', insertbackground='#ffffff')
+        except Exception:
+            pass
         # Console text color tags
         try:
             self.console_text.tag_configure('success', foreground='#22c55e')  # brighter green
@@ -113,6 +119,19 @@ class MainWindow(ttk.Frame):
         # Status bar at the bottom (row 6) — split into two rows
         status_bar = ttk.Frame(self)
         status_bar.grid(row=6, column=0, columnspan=2, sticky='ew', pady=(6, 0))
+
+        # Visual separation at the top of the status bar
+        try:
+            # Two empty lines above
+            ttk.Frame(status_bar, height=6).pack(fill='x')
+            ttk.Frame(status_bar, height=6).pack(fill='x')
+            # Separator
+            ttk.Separator(status_bar, orient='horizontal').pack(fill='x')
+            # Two empty lines below
+            ttk.Frame(status_bar, height=6).pack(fill='x')
+            ttk.Frame(status_bar, height=6).pack(fill='x')
+        except Exception:
+            pass
 
         # Row 1: Connection Status (left) + Current SKU (right)
         row1 = ttk.Frame(status_bar)
@@ -413,11 +432,39 @@ class MainWindow(ttk.Frame):
         start_index = self.console_text.index('end-1c')
         self.console_text.insert('end', message + '\n')
         end_index = self.console_text.index('end-1c')
+        # Apply an explicit tag if provided (e.g., success/warning/error)
         if tag:
             try:
                 self.console_text.tag_add(tag, start_index, end_index)
             except Exception:
                 pass
+        # Auto-highlight common instruction phrases (pink) without changing main text color
+        try:
+            patterns = [
+                r"Press\s+F(?:1|2|3|4|5|6|7|8|9|10|11|12)",
+                r"Press\s+Home",
+                r"Use\s+Settings",
+                r"Open\s+Settings",
+                r"Choose\s+Working\s+Folder",
+                r"Connect\s+to\s+Google\s+Drive",
+            ]
+            for pat in patterns:
+                m = re.search(pat, message, flags=re.IGNORECASE)
+                if not m:
+                    continue
+                # Highlight first match within the inserted line
+                line_text = message
+                rel_start = m.start()
+                rel_end = m.end()
+                # Compute absolute indices within the text widget
+                abs_start = f"{start_index}+{rel_start}c"
+                abs_end = f"{start_index}+{rel_end}c"
+                try:
+                    self.console_text.tag_add('hint', abs_start, abs_end)
+                except Exception:
+                    pass
+        except Exception:
+            pass
         self.console_text.configure(state='disabled')
         self.console_text.see('end')
         # Mirror console to terminal when UI diagnostics or verbose logging are enabled

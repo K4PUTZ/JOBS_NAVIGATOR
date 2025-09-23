@@ -37,7 +37,7 @@ def run() -> None:
 
     root = tk.Tk()
     root.title('Sofa Jobs Navigator 1.0')
-    root.geometry('1200x700')
+    root.geometry('1100x780')
     # Apply app icon (best-effort)
     try:
         set_app_icon(root)
@@ -46,8 +46,8 @@ def run() -> None:
     # Center main window on screen
     try:
         root.update_idletasks()
-        w = 1200
-        h = 700
+        w = 1100
+        h = 780
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
         x = max((sw // 2) - (w // 2), 0)
