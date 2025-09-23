@@ -28,11 +28,13 @@ if str(SRC) not in sys.path:
 
 # Import and run the app
 from sofa_jobs_navigator.app import run as app_run  # type: ignore  # noqa: E402
+from sofa_jobs_navigator.version import app_display_title  # noqa: E402
 import tkinter as tk  # noqa: E402
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Sofa Jobs Navigator")
     parser.add_argument("--auto-quit-ms", type=int, default=None, help="Auto-quit the app after N milliseconds (testing)")
+    parser.add_argument("-V", "--version", action="store_true", help="Print version and exit")
     return parser.parse_args()
 
 
@@ -53,6 +55,9 @@ def _maybe_auto_quit(root: tk.Tk, cli_ms: int | None) -> None:
 
 if __name__ == "__main__":
     args = _parse_args()
+    if args.version:
+        print(app_display_title())
+        raise SystemExit(0)
     # Monkey-patch tk.Tk to inject auto-quit scheduling after window creation
     _orig_tk = tk.Tk
 

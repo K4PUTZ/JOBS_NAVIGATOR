@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 from . import about_window as _self_module  # avoid relative confusion for mypy
+from ..version import app_display_brand
 from ..utils.app_icons import set_app_icon
 
 
@@ -58,7 +59,7 @@ class AboutWindow(tk.Toplevel):
         # Two spacer lines between squares and program name (mirror main window)
         ttk.Frame(brand, height=4).pack(side='top', anchor='w')
         ttk.Frame(brand, height=4).pack(side='top', anchor='w')
-        ttk.Label(brand, text='Sofa Jobs Navigator® 1.0').pack(side='top', anchor='w', padx=(5, 0))
+        ttk.Label(brand, text=app_display_brand()).pack(side='top', anchor='w', padx=(5, 0))
 
         # Requested spacing: 5 empty lines below
         for _ in range(5):

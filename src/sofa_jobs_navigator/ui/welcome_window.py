@@ -50,7 +50,7 @@ class WelcomeWindow(tk.Toplevel):
             'Open the right remote folder with one click or key. With the Current SKU set, a single click (or an F-key) jumps straight to the correct Google Drive folder or subfolder. It’s the fastest way to get from “I have a Vendor-ID” to “I’m working in the right place.”\n\n'
             'Save time with custom Favorites. Configure per-SKU favorites (F1–F8) that point to your most-used remote folders. These shortcuts standardize navigation across the team and cut repetitive browsing to nearly zero.\n\n'
             'Your recent SKUs, one-tap away. The app remembers the last SKUs you used and shows them as quick buttons. Copy any recent SKU in a click, with full values available in tooltips—perfect for fast reuse.\n\n'
-            'Create a local folder named “SKU + suffix.” When you’re ready to stage local files, create a consistently named folder in your preferred location in one step. It complements the online workflow (the app is online-first) while ensuring clean, predictable naming on your machine.\n\n'
+            'Create a local folder named “SKU + suffix.” When you’re ready to stage local files, create a consistently named folder in your preferred location in one step. It complements workflow while ensuring clean, predictable naming on your machine.\n\n'
         )
         # Use a read-only text box with word wrapping so content wraps cleanly
         txt = tk.Text(root, wrap='word', height=16, width=80, takefocus=0)
@@ -123,12 +123,28 @@ class WelcomeWindow(tk.Toplevel):
             img_path = next((p for p in candidates if p.exists()), None)
             if not img_path:
                 return
-            if img_path.suffix.lower() == '.png':
-                self._image_ref = tk.PhotoImage(file=str(img_path))
-            else:
+            target_size = (600, 300)
+            # Prefer Pillow for resizing to 600x300; fallback to original size if unavailable
+            try:
+                from PIL import Image, ImageTk  # type: ignore
+                im = Image.open(str(img_path))
                 try:
-                    from PIL import Image, ImageTk  # type: ignore
-                    self._image_ref = ImageTk.PhotoImage(Image.open(str(img_path)))
+                    im = im.convert('RGBA')
+                except Exception:
+                    pass
+                try:
+                    resample = getattr(Image, 'LANCZOS', getattr(Image, 'ANTIALIAS', 1))
+                except Exception:
+                    resample = 1
+                im = im.resize(target_size, resample)
+                self._image_ref = ImageTk.PhotoImage(im)
+            except Exception:
+                # Fallback: PNG via Tk PhotoImage without resizing
+                try:
+                    if img_path.suffix.lower() == '.png':
+                        self._image_ref = tk.PhotoImage(file=str(img_path))
+                    else:
+                        self._image_ref = None
                 except Exception:
                     self._image_ref = None
             if self._image_ref is not None:

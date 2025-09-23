@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from ..version import app_display_brand
 from typing import Callable, Iterable
 import re
 
@@ -241,7 +242,7 @@ class MainWindow(ttk.Frame):
         ttk.Frame(brand, height=4).pack(side='top', anchor='w')
         ttk.Frame(brand, height=4).pack(side='top', anchor='w')
         # Row 1: program name below squares, with registered mark
-        ttk.Label(brand, text='Sofa Jobs Navigator® 1.0').pack(side='top', anchor='w')
+        ttk.Label(brand, text=app_display_brand()).pack(side='top', anchor='w')
 
         # Right tools: align buttons to the right
         tools = ttk.Frame(bar)

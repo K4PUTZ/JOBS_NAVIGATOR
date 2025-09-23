@@ -10,6 +10,7 @@ import webbrowser
 import sys
 
 from .config.flags import FLAGS
+from .version import app_display_title
 from .config.settings import Settings, SettingsManager
 from .controls.hotkeys import HotkeyManager
 from .logging.event_log import LOGGER
@@ -36,7 +37,7 @@ def run() -> None:
     last_sku: str | None = None
 
     root = tk.Tk()
-    root.title('Sofa Jobs Navigator 1.0')
+    root.title(app_display_title())
     root.geometry('1100x780')
     # Apply app icon (best-effort)
     try:
