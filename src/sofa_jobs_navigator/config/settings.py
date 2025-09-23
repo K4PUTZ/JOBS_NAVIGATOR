@@ -29,9 +29,11 @@ class Settings:
     working_folder: str | None = None
     save_recent_skus: bool = True
     sounds_enabled: bool = True
-    connect_on_startup: bool = True
+    connect_on_startup: bool = False
     recent_skus: List[str] = field(default_factory=list)
     show_help_on_startup: bool = True
+    # When True, suppress the startup prompt to open Help after a failed auto-connect
+    suppress_connect_setup_prompt: bool = False
 
 
 # =================== SETTINGS MANAGER ===================
@@ -56,9 +58,10 @@ class SettingsManager:
             working_folder=raw.get('working_folder'),
             save_recent_skus=raw.get('save_recent_skus', True),
             sounds_enabled=raw.get('sounds_enabled', True),
-            connect_on_startup=raw.get('connect_on_startup', True),
+            connect_on_startup=raw.get('connect_on_startup', False),
             recent_skus=raw.get('recent_skus', []),
             show_help_on_startup=raw.get('show_help_on_startup', True),
+            suppress_connect_setup_prompt=raw.get('suppress_connect_setup_prompt', False),
         )
 
     def save(self, settings: Settings) -> None:
@@ -73,6 +76,7 @@ class SettingsManager:
             'connect_on_startup': settings.connect_on_startup,
             'recent_skus': settings.recent_skus,
             'show_help_on_startup': settings.show_help_on_startup,
+            'suppress_connect_setup_prompt': getattr(settings, 'suppress_connect_setup_prompt', False),
         }
         with self._config_path.open('w', encoding='utf-8') as fh:
             json.dump(payload, fh, indent=2)

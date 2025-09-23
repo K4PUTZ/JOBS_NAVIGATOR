@@ -322,17 +322,90 @@ def run() -> None:
                 pass
 
     def on_help_action() -> None:
-        def _apply_show(val: bool) -> None:
-            try:
-                settings.show_help_on_startup = bool(val)
-                settings_manager.save(settings)
-            except Exception:
-                pass
         try:
-            WelcomeWindow(root, on_set_show_at_startup=_apply_show, initial_show_at_startup=bool(getattr(settings, 'show_help_on_startup', True)))
+            WelcomeWindow(root)
         except Exception:
             try:
                 main_window.append_console('Help is under development.')
+            except Exception:
+                pass
+
+    def _prompt_connect_setup() -> None:
+        """Ask the user if they want to open Help after auto-connect failure.
+
+        Includes a 'Don't show again' checkbox tied to settings.suppress_connect_setup_prompt
+        and the Reset warnings button in Settings.
+        """
+        try:
+            # Build a custom dialog to include a checkbox
+            dlg = tk.Toplevel(root)
+            dlg.title('Setup Google Drive?')
+            dlg.transient(root)
+            dlg.grab_set()
+            try:
+                set_app_icon(dlg)
+            except Exception:
+                pass
+            frm = tk.Frame(dlg, padx=12, pady=12)
+            frm.pack(fill='both', expand=True)
+            msg = tk.Label(
+                frm,
+                text='It looks like you are not connected to Google Drive,\nwould you like to set up the program now?'
+            )
+            msg.pack(anchor='w')
+            dont_var = tk.BooleanVar(value=False)
+            chk = tk.Checkbutton(frm, text="Don't show again", variable=dont_var)
+            chk.pack(anchor='w', pady=(8, 0))
+            btns = tk.Frame(frm)
+            btns.pack(fill='x', pady=(12, 0))
+            result = {'ok': False}
+
+            def on_yes():
+                result['ok'] = True
+                dlg.destroy()
+
+            def on_no():
+                result['ok'] = False
+                dlg.destroy()
+
+            tk.Button(btns, text='Yes', command=on_yes).pack(side='right')
+            tk.Button(btns, text='No', command=on_no).pack(side='right', padx=(0, 6))
+
+            # Center the dialog
+            try:
+                dlg.update_idletasks()
+                w = dlg.winfo_width() or dlg.winfo_reqwidth()
+                h = dlg.winfo_height() or dlg.winfo_reqheight()
+                sw = dlg.winfo_screenwidth()
+                sh = dlg.winfo_screenheight()
+                x = max((sw // 2) - (w // 2), 0)
+                y = max((sh // 2) - (h // 2), 0)
+                dlg.geometry(f"{w}x{h}+{x}+{y}")
+            except Exception:
+                pass
+            dlg.wait_window()
+            # Persist suppression choice if checked
+            try:
+                if bool(dont_var.get()):
+                    setattr(settings, 'suppress_connect_setup_prompt', True)
+                    settings_manager.save(settings)
+            except Exception:
+                pass
+            # Open Help when user accepts
+            if result['ok']:
+                try:
+                    WelcomeWindow(root)
+                except Exception:
+                    pass
+        except Exception:
+            # Fallback to simple Yes/No without checkbox
+            try:
+                ok = messagebox.askyesno(
+                    title='Setup Google Drive?',
+                    message='It looks like you are not connected to Google Drive, would you like to set up the program now?'
+                )
+                if ok:
+                    WelcomeWindow(root)
             except Exception:
                 pass
 
@@ -387,12 +460,7 @@ def run() -> None:
         pass
     main_window.console_hint('Copy a SKU (Vendor-ID) to the memory and click search or press F12.')
     main_window.update_recents(recent_history.items())
-    # Show Welcome screen on first run if enabled, after a short delay to ensure full render
-    try:
-        if bool(getattr(settings, 'show_help_on_startup', True)):
-            root.after(1000, on_help_action)
-    except Exception:
-        pass
+    # No auto-opening Help on startup.
 
     hotkeys = HotkeyManager(root=root)
     hotkeys.setup_default_shortcuts(lambda event: handle_launch(event))
@@ -414,9 +482,9 @@ def run() -> None:
     def _attempt_auto_connect() -> None:
         if FLAGS.offline_mode:
             return
-        # Respect user setting for auto-connect; default ON
+        # Respect user setting for auto-connect; default is OFF
         try:
-            if not bool(getattr(settings, 'connect_on_startup', True)):
+            if not bool(getattr(settings, 'connect_on_startup', False)):
                 LOGGER.info('auth.auto_connect_disabled_by_setting')
                 return
         except Exception:
@@ -512,12 +580,35 @@ def run() -> None:
             except Exception:
                 pass
         except Exception:
-            # Stay silent on failure; user can connect manually
+            # Stay silent; user can connect manually or via setup prompt
             LOGGER.info('auth.auto_connect_skipped')
 
     try:
         # Schedule shortly after UI shows to avoid blocking initial render
         root.after(250, _attempt_auto_connect)
+    except Exception:
+        pass
+
+    # Additionally, bring up the setup dialog on startup when conditions are met:
+    # - working folder is empty
+    # - user is not connected
+    # - suppression flag is not enabled
+    def _maybe_prompt_setup() -> None:
+        try:
+            wf = (getattr(settings, 'working_folder', None) or '').strip()
+        except Exception:
+            wf = ''
+        try:
+            suppressed = bool(getattr(settings, 'suppress_connect_setup_prompt', False))
+        except Exception:
+            suppressed = False
+        # Determine if we're online by checking if a service factory was injected via auth flow
+        online = drive_client._service_factory is not None  # type: ignore[attr-defined]
+        if not wf and not online and not suppressed:
+            _prompt_connect_setup()
+
+    try:
+        root.after(500, _maybe_prompt_setup)
     except Exception:
         pass
 
@@ -529,3 +620,4 @@ def run() -> None:
 
 if __name__ == '__main__':
     run()
+

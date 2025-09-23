@@ -1,0 +1,1 @@
+# Help images package folder.

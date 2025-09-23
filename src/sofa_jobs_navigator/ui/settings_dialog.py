@@ -38,7 +38,7 @@ class SettingsDialog(tk.Toplevel):
         self._favorite_vars: list[tuple[tk.StringVar, tk.StringVar]] = []
         self._account_var = tk.StringVar(value=self._format_account(self._current_account))
         self._build_ui()
-        self._center_on_screen()
+        self._center_on_parent_or_screen()
 
     def _build_ui(self) -> None:
         frame = ttk.Frame(self, padding=12)
@@ -56,6 +56,8 @@ class SettingsDialog(tk.Toplevel):
         self._working_entry = ttk.Entry(wf_row, textvariable=self.working_var, width=40, state='readonly', justify='left')
         self._working_entry.pack(side='left', padx=(6, 6))
         ttk.Button(wf_row, text='Browse…', command=self._pick_working_folder).pack(side='left')
+        # Clear working folder button
+        ttk.Button(wf_row, text='Clear', command=self._clear_working_folder).pack(side='left', padx=(6, 0))
 
         # Account row
         acct_row = ttk.Frame(header)
@@ -75,16 +77,15 @@ class SettingsDialog(tk.Toplevel):
         ttk.Checkbutton(prefs_row, variable=self._sounds_var, text='On').pack(side='left', padx=(6, 12))
         # Connect on startup toggle
         ttk.Label(prefs_row, text='Connect on Startup:').pack(side='left')
-        self._connect_start_var = tk.BooleanVar(value=bool(getattr(self._settings, 'connect_on_startup', True)))
-        ttk.Checkbutton(prefs_row, variable=self._connect_start_var, text='On').pack(side='left', padx=(6, 0))
+        self._connect_start_var = tk.BooleanVar(value=bool(getattr(self._settings, 'connect_on_startup', False)))
+        ttk.Checkbutton(prefs_row, variable=self._connect_start_var, text='On').pack(side='left', padx=(6, 12))
+        # Reset warnings button (restores hidden dialogs)
+        ttk.Button(prefs_row, text='Reset warnings', command=self._on_reset_warnings).pack(side='left')
 
-        # Tip + reset help row
+        # Tip row (no reset button)
         tip_row = ttk.Frame(header)
         tip_row.pack(anchor='w', pady=(4, 0))
-        ttk.Label(tip_row, text='Tip: You can reset in-product help messages here.', foreground='#6c757d').pack(side='left')
-        ttk.Button(tip_row, text='Reset Welcome Screen', command=self._reset_welcome).pack(side='left', padx=(12, 0))
-        # Backing var for show_help_on_startup (also saved on Save)
-        self._show_help_var = tk.BooleanVar(value=bool(getattr(self._settings, 'show_help_on_startup', True)))
+        ttk.Label(tip_row, text='Tip: Use Help in the toolbar or Home key to open Welcome.', foreground='#6c757d').pack(side='left')
 
         # Separator before favorites
         ttk.Separator(frame, orient='horizontal').grid(row=1, column=0, columnspan=3, sticky='ew', pady=(8, 6))
@@ -168,12 +169,30 @@ class SettingsDialog(tk.Toplevel):
             working_folder=self.working_var.get() or None,
             save_recent_skus=self._settings.save_recent_skus,
             sounds_enabled=bool(self._sounds_var.get()) if hasattr(self, '_sounds_var') else self._settings.sounds_enabled,
-            connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', True),
+            connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', False),
             recent_skus=self._settings.recent_skus,
-            show_help_on_startup=bool(self._show_help_var.get()) if hasattr(self, '_show_help_var') else getattr(self._settings, 'show_help_on_startup', True),
+            suppress_connect_setup_prompt=False if getattr(self, '_reset_warnings_flag', False) else getattr(self._settings, 'suppress_connect_setup_prompt', False),
         )
         self._on_save(updated)
         self.destroy()
+
+    def _clear_working_folder(self) -> None:
+        """Clear the working folder field (persisted on Save)."""
+        try:
+            self._working_entry.configure(state='normal')
+            self.working_var.set('')
+            self._working_entry.configure(state='readonly')
+        except Exception:
+            pass
+
+    def _on_reset_warnings(self) -> None:
+        """Mark that warnings should be reset on save; provide immediate feedback."""
+        # We don't mutate settings yet; we mark a local flag to clear on Save.
+        self._reset_warnings_flag = True
+        try:
+            messagebox.showinfo(title='Warnings reset', message='Hidden warnings will be restored on Save.', parent=self)
+        except Exception:
+            pass
 
     def _format_account(self, account: str | None) -> str:
         return f'Account: {account or "(unauthenticated)"}'
@@ -186,25 +205,33 @@ class SettingsDialog(tk.Toplevel):
         except Exception:
             pass
 
-    def _center_on_screen(self) -> None:
+    def _center_on_parent_or_screen(self) -> None:
         try:
             self.update_idletasks()
             w = self.winfo_width() or self.winfo_reqwidth()
             h = self.winfo_height() or self.winfo_reqheight()
-            sw = self.winfo_screenwidth()
-            sh = self.winfo_screenheight()
-            x = max((sw // 2) - (w // 2), 0)
-            y = max((sh // 2) - (h // 2), 0)
+            m = self.master if isinstance(self.master, tk.Misc) else None
+            if m is not None:
+                try:
+                    m.update_idletasks()
+                except Exception:
+                    pass
+                mx = m.winfo_rootx()
+                my = m.winfo_rooty()
+                mw = m.winfo_width() or m.winfo_reqwidth()
+                mh = m.winfo_height() or m.winfo_reqheight()
+                x = mx + max((mw - w) // 2, 0)
+                y = my + max((mh - h) // 2, 0)
+            else:
+                sw = self.winfo_screenwidth()
+                sh = self.winfo_screenheight()
+                x = max((sw - w) // 2, 0)
+                y = max((sh - h) // 2, 0)
             self.geometry(f"{w}x{h}+{x}+{y}")
         except Exception:
             pass
 
-    def _reset_welcome(self) -> None:
-        try:
-            self._show_help_var.set(True)
-            messagebox.showinfo(title='Welcome Screen', message='Welcome screen will show on next start.', parent=self)
-        except Exception:
-            pass
+    # (no reset welcome control)
 
 
 # =================== END SETTINGS DIALOG ===================
