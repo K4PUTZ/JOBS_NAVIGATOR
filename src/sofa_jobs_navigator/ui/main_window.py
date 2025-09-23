@@ -110,43 +110,52 @@ class MainWindow(ttk.Frame):
         sidebar = ttk.Frame(self)
         sidebar.grid(row=5, column=1, sticky='ns')
 
-        # Status bar at the bottom (row 6)
+        # Status bar at the bottom (row 6) — split into two rows
         status_bar = ttk.Frame(self)
         status_bar.grid(row=6, column=0, columnspan=2, sticky='ew', pady=(6, 0))
-        ttk.Label(status_bar, text='Status:').pack(side='left')
+
+        # Row 1: Connection Status (left) + Current SKU (right)
+        row1 = ttk.Frame(status_bar)
+        row1.pack(fill='x')
+        left1 = ttk.Frame(row1)
+        left1.pack(side='left')
+        ttk.Label(left1, text='Status:').pack(side='left')
         self._status_var = tk.StringVar(value='Offline')
         # Colored status label (green when online, gray when offline)
-        self._status_label = ttk.Label(status_bar, textvariable=self._status_var)
+        self._status_label = ttk.Label(left1, textvariable=self._status_var)
         self._status_label.pack(side='left', padx=(6, 0))
         # Tooltip for additional details
         self._status_tooltip = _Tooltip(self._status_label)
-
-        # Current SKU field on the right side
-        right_spacer = ttk.Frame(status_bar)
-        right_spacer.pack(side='left', expand=True)
-        ttk.Label(status_bar, text='Current SKU:').pack(side='left')
+        # Spacer to push Current SKU to the right
+        ttk.Frame(row1).pack(side='left', expand=True)
+        right1 = ttk.Frame(row1)
+        right1.pack(side='left')
+        ttk.Label(right1, text='Current SKU:').pack(side='left')
         self._current_sku_var = tk.StringVar(value='(none)')
-        self._current_sku_label = ttk.Label(status_bar, textvariable=self._current_sku_var, style='Sofa.SKU.TLabel')
+        self._current_sku_label = ttk.Label(right1, textvariable=self._current_sku_var, style='Sofa.SKU.TLabel')
         self._current_sku_label.pack(side='left', padx=(6, 0))
 
-        # Working folder info and actions
-        # Small spacer before the working folder section
-        ttk.Frame(status_bar, width=12).pack(side='left')
-        ttk.Label(status_bar, text='Working Folder:').pack(side='left')
+        # Row 2: Working Folder (left) + Create Folder controls (right)
+        row2 = ttk.Frame(status_bar)
+        row2.pack(fill='x', pady=(4, 0))
+        left2 = ttk.Frame(row2)
+        left2.pack(side='left')
+        ttk.Label(left2, text='Working Folder:').pack(side='left')
         self._working_folder_var = tk.StringVar(value='(none)')
-        self._working_folder_label = ttk.Label(status_bar, textvariable=self._working_folder_var)
+        self._working_folder_label = ttk.Label(left2, textvariable=self._working_folder_var)
         self._working_folder_label.pack(side='left', padx=(6, 0))
+        # Spacer between left and right clusters
+        ttk.Frame(row2).pack(side='left', expand=True)
+        right2 = ttk.Frame(row2)
+        right2.pack(side='left')
         # Button: Create SKU folder
-        ttk.Frame(status_bar, width=12).pack(side='left')
-        self._create_btn = ttk.Button(status_bar, text='Create SKU folder', command=self._on_click_create_sku_folder)
+        self._create_btn = ttk.Button(right2, text='Create SKU folder', command=self._on_click_create_sku_folder)
         self._create_btn.pack(side='left')
         # Suffix label and entry
-        ttk.Label(status_bar, text=' + Suffix ').pack(side='left', padx=(8, 0))
+        ttk.Label(right2, text=' + Suffix ').pack(side='left', padx=(8, 0))
         self._suffix_var = tk.StringVar(value=' - FTR ')
-        self._suffix_entry = ttk.Entry(status_bar, textvariable=self._suffix_var, width=12)
+        self._suffix_entry = ttk.Entry(right2, textvariable=self._suffix_var, width=12)
         self._suffix_entry.pack(side='left')
-        # Right margin padding
-        ttk.Frame(status_bar, width=8).pack(side='right')
 
         ttk.Label(sidebar, text='Favorites').pack(anchor='w')
         self._favorites_frame = ttk.Frame(sidebar)
