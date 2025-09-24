@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from pathlib import Path
 from typing import Callable
 import os
 
@@ -116,8 +117,54 @@ class SettingsDialog(tk.Toplevel):
             # Keep storage order (label, path) to satisfy save handler
             self._favorite_vars.append((label_var, path_var))
 
+        # After the favorites section: two empty lines
+        try:
+            ttk.Frame(frame, height=8).grid(row=4, column=0, sticky='ew')
+            ttk.Frame(frame, height=8).grid(row=5, column=0, sticky='ew')
+        except Exception:
+            pass
+        # Warning text
+        try:
+            warn_text = 'Warning: ensure the path reflects the exact same pattern of the remote folders.'
+            ttk.Label(frame, text=warn_text, justify='left').grid(row=6, column=0, sticky='w', pady=(0, 6))
+        except Exception:
+            pass
+        # Two empty lines above the image (directly beneath the warning)
+        try:
+            ttk.Frame(frame, height=8).grid(row=7, column=0, sticky='ew')
+            ttk.Frame(frame, height=8).grid(row=8, column=0, sticky='ew')
+        except Exception:
+            pass
+        # Favorites.png image underneath (from help assets folder)
+        self._fav_image_ref = None  # keep a reference alive
+        try:
+            base = Path(__file__).resolve().parent / 'assets' / 'help'
+            img_path = base / 'Favorites.png'
+            if img_path.exists():
+                try:
+                    from PIL import Image, ImageTk  # type: ignore
+                    im = Image.open(str(img_path))
+                    # Optionally, constrain a maximum width to fit dialog if needed
+                    max_w = 560
+                    if im.width > max_w:
+                        ratio = max_w / float(im.width)
+                        im = im.resize((int(im.width * ratio), int(im.height * ratio)), getattr(Image, 'LANCZOS', 1))
+                    self._fav_image_ref = ImageTk.PhotoImage(im)
+                except Exception:
+                    try:
+                        # Fallback to Tk PhotoImage for PNG
+                        self._fav_image_ref = tk.PhotoImage(file=str(img_path))
+                    except Exception:
+                        self._fav_image_ref = None
+                if self._fav_image_ref is not None:
+                    # Center the image (omit sticky to center in cell)
+                    tk.Label(frame, image=self._fav_image_ref, bd=0).grid(row=9, column=0, pady=(0, 6))
+        except Exception:
+            self._fav_image_ref = None
+
+        # Buttons row (moved below the new content)
         btns = ttk.Frame(frame)
-        btns.grid(row=4, column=0, columnspan=3, pady=(12, 0))
+        btns.grid(row=10, column=0, columnspan=3, pady=(12, 0))
         ttk.Button(btns, text='Save', command=self._on_press_save).pack(side='right')
         ttk.Button(btns, text='Cancel', command=self.destroy).pack(side='right', padx=(0, 6))
 

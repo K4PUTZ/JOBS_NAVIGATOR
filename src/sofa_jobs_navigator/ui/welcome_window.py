@@ -61,12 +61,18 @@ class WelcomeWindow(tk.Toplevel):
         # Content area (image + text)
         content = ttk.Frame(root)
         content.pack(fill='both', expand=True)
+        # Two empty spacer lines above the image
+        try:
+            ttk.Frame(content, height=8).pack(fill='x')
+            ttk.Frame(content, height=8).pack(fill='x')
+        except Exception:
+            pass
         # Image holder (centered)
         self._img_label = tk.Label(content, bd=0)
-        self._img_label.pack(pady=(0, 8))
+        self._img_label.pack(pady=(0, 8), anchor='center')
         # Small text under image
         self._text_label = ttk.Label(content, text='', wraplength=560, justify='center')
-        self._text_label.pack(pady=(0, 8))
+        self._text_label.pack(pady=(0, 8), anchor='center')
 
         # Separator above navigation
         try:

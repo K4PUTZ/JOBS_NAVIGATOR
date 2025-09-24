@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from pathlib import Path
 from . import about_window as _self_module  # avoid relative confusion for mypy
 from ..version import app_display_brand
 from ..utils.app_icons import set_app_icon
@@ -61,8 +62,13 @@ class AboutWindow(tk.Toplevel):
         ttk.Frame(brand, height=4).pack(side='top', anchor='w')
         ttk.Label(brand, text=app_display_brand()).pack(side='top', anchor='w', padx=(5, 0))
 
-        # Requested spacing: 5 empty lines below
-        for _ in range(5):
+        # Horizontal separator below the logo + program name
+        try:
+            ttk.Separator(self, orient='horizontal').pack(fill='x', pady=(8, 8))
+        except Exception:
+            pass
+        # Two empty lines below the separator
+        for _ in range(2):
             ttk.Frame(self, height=8).pack(fill='x')
 
         # Credits text
@@ -76,6 +82,36 @@ class AboutWindow(tk.Toplevel):
         )
         lbl = ttk.Label(self, text=credits, justify='left')
         lbl.pack(anchor='w', padx=(5, 0))
+
+        # Below the main text: 4 empty lines (reduced by one)
+        for _ in range(4):
+            ttk.Frame(self, height=8).pack(fill='x')
+
+        # Insert sofa.png aligned to the right (from help assets folder)
+        self._about_sofa_image_ref = None
+        try:
+            base = Path(__file__).resolve().parent / 'assets' / 'help'
+            img_path = base / 'sofa.png'
+            if img_path.exists():
+                try:
+                    from PIL import Image, ImageTk  # type: ignore
+                    im = Image.open(str(img_path))
+                    self._about_sofa_image_ref = ImageTk.PhotoImage(im)
+                except Exception:
+                    try:
+                        self._about_sofa_image_ref = tk.PhotoImage(file=str(img_path))
+                    except Exception:
+                        self._about_sofa_image_ref = None
+                if self._about_sofa_image_ref is not None:
+                    img_row = ttk.Frame(self)
+                    img_row.pack(fill='x')
+                    tk.Label(img_row, image=self._about_sofa_image_ref, bd=0).pack(side='right')
+        except Exception:
+            self._about_sofa_image_ref = None
+
+        # Add three more empty lines below the image, before the button
+        for _ in range(3):
+            ttk.Frame(self, height=8).pack(fill='x')
 
         # Close button at bottom-right
         btn_row = ttk.Frame(self)
