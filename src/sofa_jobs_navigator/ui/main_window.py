@@ -248,8 +248,8 @@ class MainWindow(ttk.Frame):
         tools = ttk.Frame(bar)
         tools.grid(row=0, column=1, sticky='e')
         # Create tool buttons with vector-like glyph (font chars) + caption + keybinding
-        # Help (Home) first
-        self._make_tool_button(tools, icon='🏠', label='Help', key='Home', command=self._on_tool_help)
+        # Welcome (Home) first
+        self._make_tool_button(tools, icon='💡', label='Welcome', key='Home', command=self._on_tool_help)
         # Check Clipboard (F9)
         self._make_tool_button(tools, icon='📋', label='Check Clipboard', key='F9', command=self._on_tool_check_clipboard)
         # 2) About (F10)

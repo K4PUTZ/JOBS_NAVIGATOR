@@ -102,12 +102,12 @@ class WelcomeWindow(tk.Toplevel):
         self._pages.clear()
         self._image_refs.clear()
         texts = [
-            'Copy once, detect many. Press F12 to detect the current SKU from your clipboard.',
-            'Open the right Google Drive folder with one click or F-keys (F1–F8).',
-            'Configure Favorites per SKU to standardize navigation across the team.',
-            'Your recent SKUs stay handy as quick buttons with full values in tooltips.',
-            'Create a local folder named “SKU + suffix” in your Working Folder.',
-            'All set—enjoy faster, safer navigation. Press Finish to start.',
+            'Copy once, detect many.\n\nCopy text from anywhere—file names, folder names, emails, web pages, chats—and press F12. The app instantly search the text and detects one or more SKUs in your clipboard. The first detected SKU will become your Current SKU, so you’re ready to act without pasting or retyping.',
+            'With the Current SKU set, a single click (or key press) jumps straight to the correct Google Drive folder or subfolder. It’s the fastest way to get from “I have a Vendor-ID” to “I’m working in the right place.”',
+            'Save time with custom Favorites. Configure per-SKU favorites (F1–F8) that point to your most-used remote folders. These shortcuts standardize navigation and cut repetitive browsing to nearly zero.',
+            'Your recent SKUs, one-tap away. The app remembers the last SKUs you used and shows them as quick buttons. Copy any recent SKU in a click, with full values available in tooltips—perfect for fast reuse.',
+            'Create a local folder named “SKU + suffix.” Create a consistently named folder in your preferred location in one step, while ensuring clean, predictable naming on your machine.',
+            'All set—enjoy faster, safer navigation. Press Finish to begin working.',
         ]
         for i in range(self._page_count):
             idx = i + 1
