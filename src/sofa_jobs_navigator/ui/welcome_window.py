@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Welcome window — simplified and reliable centering."""
+"""Help/Welcome window — multipage with navigation and page indicators."""
 
 import tkinter as tk
 from tkinter import ttk
@@ -10,7 +10,13 @@ from ..utils.app_icons import set_app_icon
 
 
 class WelcomeWindow(tk.Toplevel):
-    """A minimal Welcome window that centers relative to the parent once."""
+    """A multipage Help window with 6 pages and navigation controls.
+
+    Layout per page:
+    - Top: transparent 600x300 image centered
+    - Middle: small text paragraph
+    - Bottom: navigation row with [Previous] [dots] [Next/Finish]
+    """
 
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master)
@@ -25,10 +31,25 @@ class WelcomeWindow(tk.Toplevel):
         except Exception:
             pass
 
+        # Pages state
+        self._page_count = 6
+        self._current_page = 0
+        self._pages: list[dict[str, object]] = []  # {'image': PhotoImage|None, 'text': str}
+        self._image_refs: list[object | None] = []  # keep images alive
+
+        # Build UI and show first page
         self._build_ui()
+        self._load_pages()
+        self._update_page()
         # Center once after the window is mapped; no withdraw/deiconify to avoid visibility issues
         try:
             self.after(0, self._center_once)
+        except Exception:
+            pass
+        # Keyboard navigation: Left/Right arrows
+        try:
+            self.bind('<Left>', lambda e: self._go_prev())
+            self.bind('<Right>', lambda e: self._go_next())
         except Exception:
             pass
 
@@ -37,122 +58,166 @@ class WelcomeWindow(tk.Toplevel):
         self._root = root
         root.pack(fill='both', expand=True)
 
-        # Optional top image (Help1.png)
-        self._image_ref = None  # keep reference alive
-        self._try_load_top_image()
+        # Content area (image + text)
+        content = ttk.Frame(root)
+        content.pack(fill='both', expand=True)
+        # Image holder (centered)
+        self._img_label = tk.Label(content, bd=0)
+        self._img_label.pack(pady=(0, 8))
+        # Small text under image
+        self._text_label = ttk.Label(content, text='', wraplength=560, justify='center')
+        self._text_label.pack(pady=(0, 8))
 
-        # Heading
-        ttk.Label(root, text='\n\nWelcome to Sofa Jobs Navigator', font=('TkDefaultFont', 12, 'bold')).pack(pady=(0, 8))
-
-        # Body text
-        body = (
-            '\n\nCopy once, detect many. Copy text from anywhere — file names, folder names, emails, web pages, chats—and press F12. The app instantly detects one or more SKUs in your clipboard and sets your Current SKU, so you’re ready to act without pasting or retyping.\n\n'
-            'Open the right remote folder with one click or key. With the Current SKU set, a single click (or an F-key) jumps straight to the correct Google Drive folder or subfolder. It’s the fastest way to get from “I have a Vendor-ID” to “I’m working in the right place.”\n\n'
-            'Save time with custom Favorites. Configure per-SKU favorites (F1–F8) that point to your most-used remote folders. These shortcuts standardize navigation across the team and cut repetitive browsing to nearly zero.\n\n'
-            'Your recent SKUs, one-tap away. The app remembers the last SKUs you used and shows them as quick buttons. Copy any recent SKU in a click, with full values available in tooltips—perfect for fast reuse.\n\n'
-            'Create a local folder named “SKU + suffix.” When you’re ready to stage local files, create a consistently named folder in your preferred location in one step. It complements workflow while ensuring clean, predictable naming on your machine.\n\n'
-        )
-        # Use a read-only text box with word wrapping so content wraps cleanly
-        txt = tk.Text(root, wrap='word', height=16, width=80, takefocus=0)
-        # Style it to look like part of the dialog (flat, no border) and match background (simulate transparency)
+        # Separator above navigation
         try:
-            bg = ''
-            try:
-                # Prefer ttk theme background if available
-                style = ttk.Style(root)
-                bg = style.lookup('TFrame', 'background') or ''
-            except Exception:
-                pass
-            if not bg:
-                try:
-                    bg = root.cget('background')
-                except Exception:
-                    bg = ''
-            if not bg:
-                bg = self.cget('background') if hasattr(self, 'cget') else '#f0f0f0'
-            # Match font with the rest of the program (use TLabel font or TkDefaultFont as fallback)
-            try:
-                default_font = style.lookup('TLabel', 'font') or 'TkDefaultFont'
-            except Exception:
-                default_font = 'TkDefaultFont'
-            txt.configure(bg=bg, relief='flat', bd=0, highlightthickness=0, highlightbackground=bg, insertbackground='#000000', font=default_font)
-        except Exception:
-            try:
-                txt.configure(relief='flat', bd=0, highlightthickness=0)
-            except Exception:
-                pass
-        txt.insert('1.0', body)
-        txt.configure(state='disabled')
-        txt.pack(fill='x', expand=False, padx=8, pady=(0, 6))
-        # Separator between text and buttons
-        try:
-            ttk.Separator(root, orient='horizontal').pack(fill='x', padx=8, pady=(0, 8))
-        except Exception:
-            pass
-        # Auto-size height to fit all wrapped display lines so the window grows to accommodate text
-        try:
-            self.update_idletasks()
-            display_lines = None
-            try:
-                # Count pixel-wrapped display lines if supported by Tk
-                display_lines = int(txt.count('1.0', 'end', 'displaylines')[0])
-            except Exception:
-                pass
-            if not display_lines or display_lines <= 0:
-                try:
-                    # Fallback to logical lines as a rough estimate
-                    display_lines = int(txt.index('end-1c').split('.')[0])
-                except Exception:
-                    display_lines = 16
-            # Apply height; add a small cushion
-            txt.configure(height=max(1, display_lines))
+            ttk.Separator(root, orient='horizontal').pack(fill='x', padx=8, pady=(8, 8))
         except Exception:
             pass
 
-        # Buttons row
-        btns = ttk.Frame(root)
-        btns.pack(fill='x', pady=(12, 0))
-        ttk.Frame(btns).pack(side='left', expand=True)
-        ttk.Button(btns, text='Close', command=self.destroy).pack(side='right')
+        # Navigation row: [Prev] [dots] [Next/Finish]
+        nav = ttk.Frame(root)
+        nav.pack(fill='x')
+        # Previous button (left)
+        self._btn_prev = ttk.Button(nav, text='Previous', command=self._go_prev)
+        self._btn_prev.pack(side='left')
+        # Dots panel (center)
+        dots_holder = ttk.Frame(nav)
+        dots_holder.pack(side='left', expand=True)
+        self._dots_frame = ttk.Frame(dots_holder)
+        self._dots_frame.pack()
+        # Next/Finish button (right)
+        self._btn_next = ttk.Button(nav, text='Next', command=self._go_next)
+        self._btn_next.pack(side='right')
 
-    def _try_load_top_image(self) -> None:
-        """Attempt to load assets/help/Help1.png (or .webp) and place above content."""
+    # --------- Pages: loading, navigation, rendering ---------
+    def _load_pages(self) -> None:
+        """Load up to 6 pages: images (png/webp) and small texts."""
+        base = Path(__file__).resolve().parent / 'assets' / 'help'
+        self._pages.clear()
+        self._image_refs.clear()
+        texts = [
+            'Copy once, detect many. Press F12 to detect the current SKU from your clipboard.',
+            'Open the right Google Drive folder with one click or F-keys (F1–F8).',
+            'Configure Favorites per SKU to standardize navigation across the team.',
+            'Your recent SKUs stay handy as quick buttons with full values in tooltips.',
+            'Create a local folder named “SKU + suffix” in your Working Folder.',
+            'All set—enjoy faster, safer navigation. Press Finish to start.',
+        ]
+        for i in range(self._page_count):
+            idx = i + 1
+            img = self._load_image_variant(base, f'Help{idx}')
+            self._pages.append({'image': img, 'text': texts[i] if i < len(texts) else ''})
+            self._image_refs.append(img)
+
+    def _load_image_variant(self, base: Path, stem: str):
+        """Load and resize image 'stem.(png|webp)' to 600x300; return PhotoImage or None."""
+        target_size = (600, 300)
+        candidates = [base / f'{stem}.png', base / f'{stem}.webp']
+        img_path = next((p for p in candidates if p.exists()), None)
+        if not img_path:
+            return None
         try:
-            base = Path(__file__).resolve().parent
-            candidates = [base / 'assets' / 'help' / 'Help1.png', base / 'assets' / 'help' / 'Help1.webp']
-            img_path = next((p for p in candidates if p.exists()), None)
-            if not img_path:
-                return
-            target_size = (600, 300)
-            # Prefer Pillow for resizing to 600x300; fallback to original size if unavailable
+            from PIL import Image, ImageTk  # type: ignore
+            im = Image.open(str(img_path))
             try:
-                from PIL import Image, ImageTk  # type: ignore
-                im = Image.open(str(img_path))
+                im = im.convert('RGBA')
+            except Exception:
+                pass
+            try:
+                resample = getattr(Image, 'LANCZOS', getattr(Image, 'ANTIALIAS', 1))
+            except Exception:
+                resample = 1
+            im = im.resize(target_size, resample)
+            return ImageTk.PhotoImage(im)
+        except Exception:
+            # Fallback: only PNG via Tk
+            try:
+                if img_path.suffix.lower() == '.png':
+                    return tk.PhotoImage(file=str(img_path))
+            except Exception:
+                return None
+        return None
+
+    def _go_prev(self) -> None:
+        if self._current_page > 0:
+            self._current_page -= 1
+            self._update_page()
+
+    def _go_next(self) -> None:
+        if self._current_page < self._page_count - 1:
+            self._current_page += 1
+            self._update_page()
+        else:
+            # Finish
+            try:
+                self.destroy()
+            except Exception:
+                pass
+
+    def _update_page(self) -> None:
+        # Update image
+        page = self._pages[self._current_page] if 0 <= self._current_page < len(self._pages) else None
+        img = page.get('image') if isinstance(page, dict) else None
+        txt = page.get('text') if isinstance(page, dict) else ''
+        try:
+            self._img_label.configure(image=img if img is not None else '')
+            self._img_label.image = img  # keep ref on label too
+        except Exception:
+            pass
+        try:
+            self._text_label.configure(text=str(txt or ''))
+        except Exception:
+            pass
+        # Update buttons
+        try:
+            if self._current_page == 0:
+                self._btn_prev.state(['disabled'])
+            else:
+                self._btn_prev.state(['!disabled'])
+            if self._current_page == self._page_count - 1:
+                self._btn_next.configure(text='Finish')
+            else:
+                self._btn_next.configure(text='Next')
+        except Exception:
+            pass
+        # Re-render indicators
+        self._render_indicators()
+        # Recenter once content settles
+        try:
+            self.after(0, self._center_once)
+        except Exception:
+            pass
+
+    def _render_indicators(self) -> None:
+        # Clear previous
+        for child in list(self._dots_frame.winfo_children()):
+            try:
+                child.destroy()
+            except Exception:
+                pass
+        # Draw dots as small canvases
+        for i in range(self._page_count):
+            is_active = (i == self._current_page)
+            size = 12 if is_active else 8
+            pad = 6
+            c = tk.Canvas(self._dots_frame, width=size + pad, height=size + pad, highlightthickness=0, bd=0)
+            c.pack(side='left')
+            x0 = pad // 2
+            y0 = pad // 2
+            x1 = x0 + size
+            y1 = y0 + size
+            if is_active:
+                # Outer glow (subtle)
                 try:
-                    im = im.convert('RGBA')
+                    glow_pad = 3
+                    c.create_oval(x0 - glow_pad, y0 - glow_pad, x1 + glow_pad, y1 + glow_pad, fill='#eaeaea', outline='')
                 except Exception:
                     pass
-                try:
-                    resample = getattr(Image, 'LANCZOS', getattr(Image, 'ANTIALIAS', 1))
-                except Exception:
-                    resample = 1
-                im = im.resize(target_size, resample)
-                self._image_ref = ImageTk.PhotoImage(im)
-            except Exception:
-                # Fallback: PNG via Tk PhotoImage without resizing
-                try:
-                    if img_path.suffix.lower() == '.png':
-                        self._image_ref = tk.PhotoImage(file=str(img_path))
-                    else:
-                        self._image_ref = None
-                except Exception:
-                    self._image_ref = None
-            if self._image_ref is not None:
-                lbl = tk.Label(self._root, image=self._image_ref, bd=0)
-                lbl.pack(pady=(0, 8))
-        except Exception:
-            # Silent failure: image is optional
-            self._image_ref = None
+                # Main white circle with light outline
+                c.create_oval(x0, y0, x1, y1, fill='#ffffff', outline='#d0d0d0')
+            else:
+                # Light gray small circle
+                c.create_oval(x0, y0, x1, y1, fill='#cfcfcf', outline='#d9d9d9')
 
     def _center_once(self) -> None:
         # Guard against repeated centering
