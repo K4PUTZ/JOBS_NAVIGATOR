@@ -7,10 +7,11 @@ from tkinter import ttk
 from pathlib import Path
 
 from ..utils.app_icons import set_app_icon
+from ..version import VERSION
 
 
 class WelcomeWindow(tk.Toplevel):
-    """A multipage Help window with 6 pages and navigation controls.
+    """A multipage Help window with 7 pages and navigation controls.
 
     Layout per page:
     - Top: transparent 600x300 image centered
@@ -30,9 +31,9 @@ class WelcomeWindow(tk.Toplevel):
             set_app_icon(self)
         except Exception:
             pass
-
+        
         # Pages state
-        self._page_count = 6
+        self._page_count = 7
         self._current_page = 0
         self._pages: list[dict[str, object]] = []  # {'image': PhotoImage|None, 'text': str}
         self._image_refs: list[object | None] = []  # keep images alive
@@ -97,10 +98,19 @@ class WelcomeWindow(tk.Toplevel):
 
     # --------- Pages: loading, navigation, rendering ---------
     def _load_pages(self) -> None:
-        """Load up to 6 pages: images (png/webp) and small texts."""
+        """Load up to 7 pages: images (png/webp) and small texts."""
         base = Path(__file__).resolve().parent / 'assets' / 'help'
         self._pages.clear()
         self._image_refs.clear()
+        final_text = (
+            f"Welcome to Sofa Jobs Navigator\N{REGISTERED SIGN} version {VERSION}.\n\n"
+            "Copy any Vendor-ID or SKU, press F12, and jump straight to the right Google Drive folder. "
+            "Use F1–F8 or the sidebar buttons to access your custom subfolders instantly. "
+            "Track ongoing projects with one click using recent SKUs.\n\n"
+            "Work directly in your browser instead of the Google Drive desktop app. "
+            "You’ll avoid headaches like synchronization conflicts between machines, forced app updates, cache corruption, "
+            "out-of-disk-space issues, and crashes after system updates. The browser is reliable, consistent, and instant."
+        )
         texts = [
             'Copy once, detect many.\n\nCopy text from anywhere—file names, folder names, emails, web pages, chats—and press F12. The app instantly search the text and detects one or more SKUs in your clipboard. The first detected SKU will become your Current SKU, so you’re ready to act without pasting or retyping.',
             'With the Current SKU set, a single click (or key press) jumps straight to the correct Google Drive folder or subfolder. It’s the fastest way to get from “I have a Vendor-ID” to “I’m working in the right place.”',
@@ -108,7 +118,11 @@ class WelcomeWindow(tk.Toplevel):
             'Your recent SKUs, one-tap away. The app remembers the last SKUs you used and shows them as quick buttons. Copy any recent SKU in a click, with full values available in tooltips—perfect for fast reuse.',
             'Create a local folder named “SKU + suffix.” Create a consistently named folder in your preferred location in one step, while ensuring clean, predictable naming on your machine.',
             'All set—enjoy faster, safer navigation. Press Finish to begin working.',
+            final_text,
         ]
+        # Move page 7 text to page 1; shift pages 1–6 to pages 2–7
+        if len(texts) == 7:
+            texts = [texts[-1]] + texts[:-1]
         for i in range(self._page_count):
             idx = i + 1
             img = self._load_image_variant(base, f'Help{idx}')
