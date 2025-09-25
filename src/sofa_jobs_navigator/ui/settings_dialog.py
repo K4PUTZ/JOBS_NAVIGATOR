@@ -69,19 +69,32 @@ class SettingsDialog(tk.Toplevel):
         ttk.Button(auth_btns, text='Connect / Refresh', command=self._on_auth_connect).pack(side='left', padx=(0, 6))
         ttk.Button(auth_btns, text='Clear Tokens', command=self._on_auth_clear).pack(side='left', padx=(0, 6))
 
-        # Preferences row: Sounds on/off and Connect on Startup
-        prefs_row = ttk.Frame(header)
-        prefs_row.pack(anchor='w', pady=(2, 6))
-        # Sounds toggle
-        ttk.Label(prefs_row, text='Sounds:').pack(side='left')
+        # Preferences: each control on its own line, with inverted label/checkbox style
+        # 1) Sounds On
+        sounds_row = ttk.Frame(header)
+        sounds_row.pack(anchor='w', pady=(2, 2))
         self._sounds_var = tk.BooleanVar(value=bool(self._settings.sounds_enabled))
-        ttk.Checkbutton(prefs_row, variable=self._sounds_var, text='On').pack(side='left', padx=(6, 12))
-        # Connect on startup toggle
-        ttk.Label(prefs_row, text='Connect on Startup:').pack(side='left')
+        _cb_sounds = ttk.Checkbutton(sounds_row, variable=self._sounds_var)
+        _cb_sounds.pack(side='left', padx=(0, 6))
+        ttk.Label(sounds_row, text='Sounds On.').pack(side='left')
+        # 2) Connect on Startup (one line down)
+        conn_row = ttk.Frame(header)
+        conn_row.pack(anchor='w', pady=(2, 2))
         self._connect_start_var = tk.BooleanVar(value=bool(getattr(self._settings, 'connect_on_startup', False)))
-        ttk.Checkbutton(prefs_row, variable=self._connect_start_var, text='On').pack(side='left', padx=(6, 12))
-        # Reset warnings button (restores hidden dialogs)
-        ttk.Button(prefs_row, text='Reset warnings', command=self._on_reset_warnings).pack(side='left')
+        _cb_connect = ttk.Checkbutton(conn_row, variable=self._connect_start_var)
+        _cb_connect.pack(side='left', padx=(0, 6))
+        ttk.Label(conn_row, text='Connect on Startup.').pack(side='left')
+        # 3) Open root folder on SKU found (new option; disabled by default)
+        open_row = ttk.Frame(header)
+        open_row.pack(anchor='w', pady=(2, 6))
+        self._open_root_var = tk.BooleanVar(value=bool(getattr(self._settings, 'open_root_on_sku_found', False)))
+        _cb_open_root = ttk.Checkbutton(open_row, variable=self._open_root_var)
+        _cb_open_root.pack(side='left', padx=(0, 6))
+        ttk.Label(open_row, text='Open root folder on SKU found.').pack(side='left')
+        # 4) Reset warnings (another line down)
+        reset_row = ttk.Frame(header)
+        reset_row.pack(anchor='w', pady=(2, 6))
+        ttk.Button(reset_row, text='Reset warnings', command=self._on_reset_warnings).pack(side='left')
 
         # Tip row (no reset button)
         tip_row = ttk.Frame(header)
@@ -217,6 +230,7 @@ class SettingsDialog(tk.Toplevel):
             save_recent_skus=self._settings.save_recent_skus,
             sounds_enabled=bool(self._sounds_var.get()) if hasattr(self, '_sounds_var') else self._settings.sounds_enabled,
             connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', False),
+            open_root_on_sku_found=bool(self._open_root_var.get()) if hasattr(self, '_open_root_var') else getattr(self._settings, 'open_root_on_sku_found', False),
             recent_skus=self._settings.recent_skus,
             suppress_connect_setup_prompt=False if getattr(self, '_reset_warnings_flag', False) else getattr(self._settings, 'suppress_connect_setup_prompt', False),
         )

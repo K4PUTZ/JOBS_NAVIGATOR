@@ -150,6 +150,29 @@ def run() -> None:
             main_window.set_favorites_enabled(True)
         except Exception:
             pass
+        # Optionally open the root folder of the SKU when setting is enabled
+        try:
+            if bool(getattr(settings, 'open_root_on_sku_found', False)):
+                # Resolve root path and open in browser (same as navigate_to_favorite with empty path)
+                try:
+                    result = drive_client.resolve_relative_path(sku, '')
+                    url = f"https://drive.google.com/drive/folders/{result.folder_id}"
+                    main_window.console_success(f"Opening SKU root in browser: {url}")
+                    try:
+                        opened = webbrowser.open(url, new=2)
+                        if not opened:
+                            if sys.platform == 'darwin':
+                                subprocess.run(['open', url], check=False)
+                            elif os.name == 'nt':
+                                subprocess.run(['start', url], shell=True, check=False)
+                            else:
+                                subprocess.run(['xdg-open', url], check=False)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def on_create_sku_folder(suffix: str) -> None:
         """Create a local folder under the configured Working Folder named 'SKU + suffix'."""
@@ -420,6 +443,7 @@ def run() -> None:
         on_about=on_about_action,
         on_help=on_help_action,
         on_create_sku_folder=on_create_sku_folder,
+        on_settings_change=lambda s: settings_manager.save(s),
     )
     # Ensure window is large enough to accommodate all UI elements
     try:

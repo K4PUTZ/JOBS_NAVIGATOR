@@ -12,7 +12,7 @@ APP_NAME: str = "Sofa Jobs Navigator"
 APP_NAME_BRANDED: str = "Sofa Jobs Navigator\N{REGISTERED SIGN}"
 
 # Human-visible version tag
-VERSION: str = "beta 1.07"
+VERSION: str = "beta 1.08"
 
 
 def app_display_title() -> str:

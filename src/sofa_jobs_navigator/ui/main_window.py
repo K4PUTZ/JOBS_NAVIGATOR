@@ -32,9 +32,11 @@ class MainWindow(ttk.Frame):
         on_about: Callable[[], None] | None = None,
         on_help: Callable[[], None] | None = None,
         on_create_sku_folder: Callable[[str], None] | None = None,
+        on_settings_change: Callable[[Settings], None] | None = None,
     ) -> None:
         super().__init__(master, padding=12)
         self._settings = settings
+        self._on_settings_change = on_settings_change
         self._on_launch_shortcut = on_launch_shortcut
         self._on_open_settings = on_open_settings
         self._on_check_clipboard = on_check_clipboard
@@ -102,6 +104,15 @@ class MainWindow(ttk.Frame):
             self.console_text.configure(bg='#1e1e1e', fg='#ffffff', insertbackground='#ffffff')
         except Exception:
             pass
+        # Context menu: right-click to Copy selection
+        try:
+            self._console_menu = tk.Menu(self, tearoff=0)
+            self._console_menu.add_command(label='Copy', command=self._copy_console_selection)
+            # Right-click bindings (Windows/Linux) and Ctrl-click (macOS)
+            self.console_text.bind('<Button-3>', self._show_console_context_menu)
+            self.console_text.bind('<Control-Button-1>', self._show_console_context_menu)
+        except Exception:
+            self._console_menu = None  # type: ignore[assignment]
         # Console text color tags
         try:
             self.console_text.tag_configure('success', foreground='#22c55e')  # brighter green
@@ -202,9 +213,15 @@ class MainWindow(ttk.Frame):
         right2.pack(side='left')
         # Suffix first
         ttk.Label(right2, text='Suffix').pack(side='left', padx=(8, 6))
-        self._suffix_var = tk.StringVar(value=' - FTR ')
+        # Initialize suffix from settings (persisted)
+        self._suffix_var = tk.StringVar(value=getattr(self._settings, 'default_suffix', ' - FTR '))
         self._suffix_entry = ttk.Entry(right2, textvariable=self._suffix_var, width=12)
         self._suffix_entry.pack(side='left')
+        # Persist suffix when focus leaves the field
+        try:
+            self._suffix_entry.bind('<FocusOut>', lambda e: self._persist_suffix())
+        except Exception:
+            pass
         # Button after suffix
         self._create_btn = ttk.Button(right2, text='Create Folder', command=self._on_click_create_sku_folder)
         self._create_btn.pack(side='left', padx=(8, 0))
@@ -510,6 +527,28 @@ class MainWindow(ttk.Frame):
         except Exception:
             return ''
 
+    def _persist_suffix(self) -> None:
+        """Persist current suffix into settings and update button tooltip/addon."""
+        try:
+            current = (self._suffix_var.get() or '')
+        except Exception:
+            current = ''
+        try:
+            # Update settings object in memory so Settings dialog save or app-initiated saves persist it
+            if hasattr(self, '_settings'):
+                setattr(self._settings, 'default_suffix', current)
+        except Exception:
+            pass
+        # Notify app to persist settings immediately if callback provided
+        try:
+            if callable(getattr(self, '_on_settings_change', None)):
+                self._on_settings_change(self._settings)  # type: ignore[misc]
+        except Exception:
+            pass
+        # Refresh UI bits that depend on suffix
+        self._refresh_working_folder_addon()
+        self._refresh_create_button_state()
+
     def _refresh_working_folder_addon(self) -> None:
         """Show or hide the cyan "/SKU + suffix" addon after the working folder path.
 
@@ -728,6 +767,57 @@ class MainWindow(ttk.Frame):
             except Exception:
                 pass
 
+    def _show_console_context_menu(self, event):  # noqa: ANN001
+        try:
+            # Enable/disable Copy based on selection presence
+            has_sel = False
+            try:
+                self.console_text.index('sel.first')
+                self.console_text.index('sel.last')
+                has_sel = True
+            except Exception:
+                has_sel = False
+            try:
+                self._console_menu.entryconfig(0, state=(tk.NORMAL if has_sel else tk.DISABLED))
+            except Exception:
+                pass
+            # Show the menu at cursor position
+            self._console_menu.tk_popup(event.x_root, event.y_root)
+        except Exception:
+            pass
+        finally:
+            try:
+                self._console_menu.grab_release()
+            except Exception:
+                pass
+
+    def _copy_console_selection(self) -> None:
+        """Copy current selection from console to clipboard and show a small toast."""
+        try:
+            start = self.console_text.index('sel.first')
+            end = self.console_text.index('sel.last')
+        except Exception:
+            return
+        try:
+            text = self.console_text.get(start, end)
+        except Exception:
+            text = ''
+        if not text:
+            return
+        self._copy_to_clipboard(text)
+        # Show a tiny toast near the mouse cursor
+        try:
+            x = self.winfo_pointerx()
+            y = self.winfo_pointery()
+            tw = tk.Toplevel(self)
+            tw.wm_overrideredirect(True)
+            tw.wm_geometry(f"+{x+10}+{y+10}")
+            lbl = tk.Label(tw, text='Copied', bg='#333333', fg='#ffffff', bd=0, padx=6, pady=3)
+            lbl.pack()
+            tw.after(700, tw.destroy)
+        except Exception:
+            pass
+
     def _format_recent_text(self, sku: str, max_len: int = 28) -> str:
         s = str(sku)
         if len(s) <= max_len:
@@ -766,7 +856,7 @@ class MainWindow(ttk.Frame):
 
         def on_click(event):  # noqa: ANN001
             target = getattr(event, 'widget', None)
-            # Clear console selection if click is outside console
+            # Clear console selection if click is outside console (focus will naturally move to clicked widget)
             try:
                 if not is_descendant(target, self.console_text):
                     try:
@@ -781,6 +871,17 @@ class MainWindow(ttk.Frame):
                             self.console_text.configure(state=prev)
                         except Exception:
                             pass
+                    # Ensure focus leaves the console: prefer clicked widget, else fallback to this frame
+                    try:
+                        if target is not None:
+                            target.focus_set()
+                        else:
+                            self.focus_set()
+                    except Exception:
+                        try:
+                            self.focus_set()
+                        except Exception:
+                            pass
             except Exception:
                 pass
             # Clear suffix entry selection if click is outside suffix field
@@ -790,6 +891,22 @@ class MainWindow(ttk.Frame):
                         self._suffix_entry.selection_clear()
                     except Exception:
                         pass
+                    # Persist suffix on click-away
+                    try:
+                        self._persist_suffix()
+                    except Exception:
+                        pass
+                    # Ensure focus leaves the suffix field similarly
+                    try:
+                        if target is not None:
+                            target.focus_set()
+                        else:
+                            self.focus_set()
+                    except Exception:
+                        try:
+                            self.focus_set()
+                        except Exception:
+                            pass
             except Exception:
                 pass
 

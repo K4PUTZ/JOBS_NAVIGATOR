@@ -27,9 +27,13 @@ class Favorite:
 class Settings:
     favorites: List[Favorite] = field(default_factory=list)
     working_folder: str | None = None
+    # Suffix appended to SKU when creating local folders (persisted)
+    default_suffix: str = " - FTR "
     save_recent_skus: bool = True
     sounds_enabled: bool = True
     connect_on_startup: bool = False
+    # When enabled, automatically open the SKU root in the browser when a SKU is found
+    open_root_on_sku_found: bool = False
     recent_skus: List[str] = field(default_factory=list)
     show_help_on_startup: bool = True
     # When True, suppress the startup prompt to open Help after a failed auto-connect
@@ -56,9 +60,11 @@ class SettingsManager:
         return Settings(
             favorites=favorites,
             working_folder=raw.get('working_folder'),
+            default_suffix=raw.get('default_suffix', ' - FTR '),
             save_recent_skus=raw.get('save_recent_skus', True),
             sounds_enabled=raw.get('sounds_enabled', True),
             connect_on_startup=raw.get('connect_on_startup', False),
+            open_root_on_sku_found=raw.get('open_root_on_sku_found', False),
             recent_skus=raw.get('recent_skus', []),
             show_help_on_startup=raw.get('show_help_on_startup', True),
             suppress_connect_setup_prompt=raw.get('suppress_connect_setup_prompt', False),
@@ -71,9 +77,11 @@ class SettingsManager:
         payload = {
             'favorites': [asdict(fav) for fav in settings.favorites],
             'working_folder': settings.working_folder,
+            'default_suffix': getattr(settings, 'default_suffix', ' - FTR '),
             'save_recent_skus': settings.save_recent_skus,
             'sounds_enabled': settings.sounds_enabled,
             'connect_on_startup': settings.connect_on_startup,
+            'open_root_on_sku_found': getattr(settings, 'open_root_on_sku_found', False),
             'recent_skus': settings.recent_skus,
             'show_help_on_startup': settings.show_help_on_startup,
             'suppress_connect_setup_prompt': getattr(settings, 'suppress_connect_setup_prompt', False),
