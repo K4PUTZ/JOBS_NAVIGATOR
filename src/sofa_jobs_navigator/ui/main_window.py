@@ -117,6 +117,42 @@ class MainWindow(ttk.Frame):
         sidebar = ttk.Frame(self)
         sidebar.grid(row=5, column=1, sticky='ns')
 
+        # Sidebar: CURRENT SKU section above Favorites
+        try:
+            # Two empty lines
+            ttk.Frame(sidebar, height=6).pack(fill='x')
+            ttk.Frame(sidebar, height=6).pack(fill='x')
+            # Label
+            ttk.Label(sidebar, text='CURRENT SKU').pack(anchor='w')
+            # Field container
+            field_row = ttk.Frame(sidebar)
+            field_row.pack(fill='x', pady=(2, 2))
+            # Read-only field: bold cyan on dark gray, truncated at end
+            self._side_current_sku_var = tk.StringVar(value='(none)')
+            self._side_current_sku_entry = tk.Entry(
+                field_row,
+                textvariable=self._side_current_sku_var,
+                font=('Segoe UI', 10, 'bold'),
+                bg='#2b2b2b',
+                fg='#0dcaf0',
+                disabledforeground='#0dcaf0',
+                disabledbackground='#2b2b2b',
+                relief='flat',
+                width=34,
+            )
+            self._side_current_sku_entry.pack(fill='x')
+            try:
+                self._side_current_sku_entry.configure(state='disabled')  # make read-only
+            except Exception:
+                pass
+            # Tooltip with full SKU (dark theme)
+            self._side_current_sku_tooltip = _Tooltip(self._side_current_sku_entry, text='(none)', bg='#333333', fg='#ffffff')
+            # Two empty lines after
+            ttk.Frame(sidebar, height=6).pack(fill='x')
+            ttk.Frame(sidebar, height=6).pack(fill='x')
+        except Exception:
+            pass
+
         # Status bar at the bottom (row 6) — split into two rows
         status_bar = ttk.Frame(self)
         status_bar.grid(row=6, column=0, columnspan=2, sticky='ew', pady=(6, 0))
@@ -146,14 +182,7 @@ class MainWindow(ttk.Frame):
         self._status_label.pack(side='left', padx=(6, 0))
         # Tooltip for additional details
         self._status_tooltip = _Tooltip(self._status_label)
-        # Spacer to push Current SKU to the right
-        ttk.Frame(row1).pack(side='left', expand=True)
-        right1 = ttk.Frame(row1)
-        right1.pack(side='left')
-        ttk.Label(right1, text='Current SKU:').pack(side='left')
-        self._current_sku_var = tk.StringVar(value='(none)')
-        self._current_sku_label = ttk.Label(right1, textvariable=self._current_sku_var, style='Sofa.SKU.TLabel')
-        self._current_sku_label.pack(side='left', padx=(6, 0))
+    # (Removed Current SKU from status bar)
 
         # Row 2: Working Folder (left) + Create Folder controls (right)
         row2 = ttk.Frame(status_bar)
@@ -164,18 +193,41 @@ class MainWindow(ttk.Frame):
         self._working_folder_var = tk.StringVar(value='(none)')
         self._working_folder_label = ttk.Label(left2, textvariable=self._working_folder_var)
         self._working_folder_label.pack(side='left', padx=(6, 0))
+        # Cyan addon: "/SKU + suffix" (shown when both folder and SKU exist)
+        self._working_folder_sku_label = ttk.Label(left2, text='', foreground='#0dcaf0')
+        self._working_folder_sku_label.pack(side='left', padx=(6, 0))
         # Spacer between left and right clusters
         ttk.Frame(row2).pack(side='left', expand=True)
         right2 = ttk.Frame(row2)
         right2.pack(side='left')
-        # Button: Create SKU folder
-        self._create_btn = ttk.Button(right2, text='Create SKU folder', command=self._on_click_create_sku_folder)
-        self._create_btn.pack(side='left')
-        # Suffix label and entry
-        ttk.Label(right2, text=' + Suffix ').pack(side='left', padx=(8, 0))
+        # Suffix first
+        ttk.Label(right2, text='Suffix').pack(side='left', padx=(8, 6))
         self._suffix_var = tk.StringVar(value=' - FTR ')
         self._suffix_entry = ttk.Entry(right2, textvariable=self._suffix_var, width=12)
         self._suffix_entry.pack(side='left')
+        # Button after suffix
+        self._create_btn = ttk.Button(right2, text='Create Folder', command=self._on_click_create_sku_folder)
+        self._create_btn.pack(side='left', padx=(8, 0))
+        # Disabled by default; will enable when a SKU is set and Working Folder configured
+        try:
+            self._create_btn.configure(state=tk.DISABLED)
+        except Exception:
+            pass
+        # Tooltip explaining requirements
+        try:
+            self._create_btn_tooltip = _Tooltip(
+                self._create_btn,
+                text='Disabled: detect a SKU and set a Working Folder in Settings',
+                bg='#333333',
+                fg='#ffffff',
+            )
+        except Exception:
+            self._create_btn_tooltip = None  # type: ignore[assignment]
+        # Keep the cyan addon in sync if user edits suffix
+        try:
+            self._suffix_var.trace_add('write', lambda *args: self._refresh_working_folder_addon())
+        except Exception:
+            pass
 
         ttk.Label(sidebar, text='Favorites').pack(anchor='w')
         self._favorites_frame = ttk.Frame(sidebar)
@@ -215,6 +267,12 @@ class MainWindow(ttk.Frame):
 
         # Initialize as empty/disabled
         self.update_recents([])
+
+        # Clicking anywhere outside console or suffix entry will clear their selection
+        try:
+            self._install_global_deselect_handlers()
+        except Exception:
+            pass
 
         self.pack(fill='both', expand=True)
 
@@ -390,15 +448,42 @@ class MainWindow(ttk.Frame):
     def set_current_sku(self, sku: str | None) -> None:
         """Update the current SKU display in the status bar."""
         value = (sku or '').strip() or '(none)'
+        # Update sidebar CURRENT SKU field (truncated) and tooltip
         try:
-            self._current_sku_var.set(value)
+            short = self._format_recent_text(value, max_len=34)
+            # Temporarily enable to update text if necessary
+            try:
+                self._side_current_sku_entry.configure(state='normal')
+            except Exception:
+                pass
+            try:
+                self._side_current_sku_var.set(short)
+            except Exception:
+                pass
+            try:
+                self._side_current_sku_entry.configure(state='disabled')
+            except Exception:
+                pass
+            try:
+                self._side_current_sku_tooltip.set_text(value)
+                self._side_current_sku_tooltip.bg = '#333333'
+                self._side_current_sku_tooltip.fg = '#ffffff'
+            except Exception:
+                pass
         except Exception:
             pass
+        # Track current SKU (raw) and refresh addon
+        try:
+            self._current_sku_value = None if value == '(none)' else value
+        except Exception:
+            self._current_sku_value = None
+        self._refresh_working_folder_addon()
+        self._refresh_create_button_state()
 
     def get_current_sku(self) -> str | None:
         """Return the current SKU string or None when not set."""
         try:
-            v = (self._current_sku_var.get() or '').strip()
+            v = (getattr(self, '_current_sku_value', None) or '').strip()
             return v or None
         except Exception:
             return None
@@ -410,6 +495,8 @@ class MainWindow(ttk.Frame):
             self._working_folder_var.set(value)
         except Exception:
             pass
+        self._refresh_working_folder_addon()
+        self._refresh_create_button_state()
 
     def get_working_folder(self) -> str:
         try:
@@ -422,6 +509,63 @@ class MainWindow(ttk.Frame):
             return self._suffix_var.get()
         except Exception:
             return ''
+
+    def _refresh_working_folder_addon(self) -> None:
+        """Show or hide the cyan "/SKU + suffix" addon after the working folder path.
+
+        Conditions: shows only when a non-empty working folder and a current SKU are available.
+        """
+        try:
+            folder = (self._working_folder_var.get() or '').strip()
+        except Exception:
+            folder = ''
+        sku = (getattr(self, '_current_sku_value', None) or '').strip()
+        if not folder or folder == '(none)' or not sku:
+            try:
+                self._working_folder_sku_label.configure(text='')
+            except Exception:
+                pass
+            return
+        # Build addon: "/SKU + suffix"
+        try:
+            suffix = self.get_suffix_text()
+        except Exception:
+            suffix = ''
+        addon = f" /{sku}{suffix}"
+        try:
+            self._working_folder_sku_label.configure(text=addon)
+        except Exception:
+            pass
+
+    def _refresh_create_button_state(self) -> None:
+        """Enable the Create Folder button only when both SKU and Working Folder are set."""
+        try:
+            folder = (self._working_folder_var.get() or '').strip()
+        except Exception:
+            folder = ''
+        try:
+            sku = (getattr(self, '_current_sku_value', None) or '').strip()
+        except Exception:
+            sku = ''
+        enabled = bool(sku) and bool(folder) and folder != '(none)'
+        try:
+            self._create_btn.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
+        except Exception:
+            pass
+        # Update tooltip to reflect current state and action
+        try:
+            if getattr(self, '_create_btn_tooltip', None) is not None:
+                if enabled:
+                    suffix = self.get_suffix_text()
+                    self._create_btn_tooltip.set_text(f"Create local folder: {sku}{suffix}")
+                    self._create_btn_tooltip.bg = '#333333'
+                    self._create_btn_tooltip.fg = '#ffffff'
+                else:
+                    self._create_btn_tooltip.set_text('Disabled: detect a SKU and set a Working Folder in Settings')
+                    self._create_btn_tooltip.bg = '#333333'
+                    self._create_btn_tooltip.fg = '#ffffff'
+        except Exception:
+            pass
 
     # =================== CONSOLE HELPERS ===================
     def append_console(self, message: str, tag: str | None = None) -> None:
@@ -601,6 +745,56 @@ class MainWindow(ttk.Frame):
             lbl.pack()
             # Auto-destroy
             tw.after(max(200, duration_ms), tw.destroy)
+        except Exception:
+            pass
+
+    # =================== UI UTILITIES ===================
+    def _install_global_deselect_handlers(self) -> None:
+        """Bind a global click to clear selection in console and suffix entry when clicking elsewhere."""
+        top = self.winfo_toplevel()
+
+        def is_descendant(child: tk.Widget | None, parent: tk.Widget | None) -> bool:
+            try:
+                w = child
+                while w is not None:
+                    if w is parent:
+                        return True
+                    w = w.master  # type: ignore[attr-defined]
+            except Exception:
+                return False
+            return False
+
+        def on_click(event):  # noqa: ANN001
+            target = getattr(event, 'widget', None)
+            # Clear console selection if click is outside console
+            try:
+                if not is_descendant(target, self.console_text):
+                    try:
+                        # Attempt to remove selection without changing state
+                        self.console_text.tag_remove('sel', '1.0', 'end')
+                    except Exception:
+                        # Fallback: toggle state temporarily
+                        try:
+                            prev = str(self.console_text.cget('state'))
+                            self.console_text.configure(state='normal')
+                            self.console_text.tag_remove('sel', '1.0', 'end')
+                            self.console_text.configure(state=prev)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            # Clear suffix entry selection if click is outside suffix field
+            try:
+                if not is_descendant(target, getattr(self, '_suffix_entry', None)):
+                    try:
+                        self._suffix_entry.selection_clear()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        try:
+            top.bind_all('<Button-1>', on_click, add=True)
         except Exception:
             pass
 

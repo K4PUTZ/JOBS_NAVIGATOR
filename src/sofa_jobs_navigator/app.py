@@ -38,7 +38,7 @@ def run() -> None:
 
     root = tk.Tk()
     root.title(app_display_title())
-    root.geometry('1100x780')
+    root.geometry('1100x820')
     # Apply app icon (best-effort)
     try:
         set_app_icon(root)
@@ -48,7 +48,7 @@ def run() -> None:
     try:
         root.update_idletasks()
         w = 1100
-        h = 780
+        h = 820
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
         x = max((sw // 2) - (w // 2), 0)
