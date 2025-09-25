@@ -61,12 +61,14 @@ class WelcomeWindow(tk.Toplevel):
         self._build_ui()
         self._load_pages()
         self._update_page()
-        # Content-based sizing (remove large fixed 720px min height)
+        # Fixed sizing so every page fits consistently (no dynamic shrink/grow)
         try:
             self.update_idletasks()
-            w = max(self.winfo_width(), 640)
-            h = self.winfo_height()  # just enough for current content
-            self.minsize(w, h)
+            # Determine required space; enforce a stable baseline height for tallest page
+            req_w = max(640, self._root.winfo_reqwidth(), self.winfo_width())
+            req_h = max(600, self._root.winfo_reqheight(), self.winfo_height())
+            self.minsize(req_w, req_h)
+            self.geometry(f"{req_w}x{req_h}")
         except Exception:
             pass
         try:
