@@ -11,12 +11,14 @@ from ..version import VERSION
 
 
 class WelcomeWindow(tk.Toplevel):
-    """A multipage Help window with 7 pages and navigation controls.
+    """Multipage Help / Welcome window (7 pages) with simple navigation.
 
     Layout per page:
-    - Top: transparent 600x300 image centered
-    - Middle: small text paragraph
-    - Bottom: navigation row with [Previous] [dots] [Next/Finish]
+      • Image (600x300) centered
+      • A wrapped text paragraph
+      • Navigation row: [Previous]  •••••••  [Next/Finish]
+
+    This version hard‑codes the final desired page order (no runtime rotation).
     """
 
     def __init__(self, master: tk.Misc) -> None:
@@ -31,11 +33,11 @@ class WelcomeWindow(tk.Toplevel):
             set_app_icon(self)
         except Exception:
             pass
-        
-        # Pages state
-        self._page_count = 7
-        self._current_page = 0
-        self._pages: list[dict[str, object]] = []  # {'image': PhotoImage|None, 'text': str}
+
+        # Pages state containers (populated in _load_pages)
+        self._page_count: int = 0
+        self._current_page: int = 0
+        self._pages: list[dict[str, object]] = []   # {'image': PhotoImage|None, 'text': str}
         self._image_refs: list[object | None] = []  # keep images alive
 
         # Build UI and show first page
@@ -71,8 +73,8 @@ class WelcomeWindow(tk.Toplevel):
         # Image holder (centered)
         self._img_label = tk.Label(content, bd=0)
         self._img_label.pack(pady=(0, 8), anchor='center')
-        # Small text under image
-        self._text_label = ttk.Label(content, text='', wraplength=560, justify='center')
+        # Small text under image (reduced width to ~75% for better readability)
+        self._text_label = ttk.Label(content, text='', wraplength=420, justify='center')
         self._text_label.pack(pady=(0, 8), anchor='center')
 
         # Separator above navigation
@@ -98,35 +100,63 @@ class WelcomeWindow(tk.Toplevel):
 
     # --------- Pages: loading, navigation, rendering ---------
     def _load_pages(self) -> None:
-        """Load up to 7 pages: images (png/webp) and small texts."""
+        """Load pages (images + text) in their final intended order.
+
+        Order is now permanent (no runtime rotation):
+          1. Welcome / high‑level rationale
+          2. Clipboard SKU detection
+          3. One‑click navigation
+          4. Favorites
+          5. Recent SKUs
+          6. Local folder creation
+          7. Finish
+        """
         base = Path(__file__).resolve().parent / 'assets' / 'help'
         self._pages.clear()
         self._image_refs.clear()
-        final_text = (
-            f"Welcome to Sofa Jobs Navigator\N{REGISTERED SIGN} version {VERSION}.\n\n"
-            "Copy any Vendor-ID or SKU, press F12, and jump straight to the right Google Drive folder. "
-            "Use F1–F8 or the sidebar buttons to access your custom subfolders instantly. "
-            "Track ongoing projects with one click using recent SKUs.\n\n"
-            "Work directly in your browser instead of the Google Drive desktop app. "
-            "You’ll avoid headaches like synchronization conflicts between machines, forced app updates, cache corruption, "
-            "out-of-disk-space issues, and crashes after system updates. The browser is reliable, consistent, and instant."
-        )
-        texts = [
-            'Copy once, detect many.\n\nCopy text from anywhere—file names, folder names, emails, web pages, chats—and press F12. The app instantly search the text and detects one or more SKUs in your clipboard. The first detected SKU will become your Current SKU, so you’re ready to act without pasting or retyping.',
-            'With the Current SKU set, a single click (or key press) jumps straight to the correct Google Drive folder or subfolder. It’s the fastest way to get from “I have a Vendor-ID” to “I’m working in the right place.”',
-            'Save time with custom Favorites. Configure per-SKU favorites (F1–F8) that point to your most-used remote folders. These shortcuts standardize navigation and cut repetitive browsing to nearly zero.',
-            'Your recent SKUs, one-tap away. The app remembers the last SKUs you used and shows them as quick buttons. Copy any recent SKU in a click, with full values available in tooltips—perfect for fast reuse.',
-            'Create a local folder named “SKU + suffix.” Create a consistently named folder in your preferred location in one step, while ensuring clean, predictable naming on your machine.',
-            'All set—enjoy faster, safer navigation. Press Finish to begin working.',
-            final_text,
+
+        texts: list[str] = [
+            (
+                f"Welcome to Sofa Jobs Navigator® – {VERSION}.\n\n"
+                "Copy any Vendor-ID or SKU, press F12, and jump straight to the correct Google Drive folder. "
+                "Work directly in your browser to avoid sync conflicts, forced app updates, cache corruption, "
+                "disk space issues, and crashes. The browser is reliable, consistent, and instant."
+            ),
+            (
+                "Copy once, detect many.\n\n"
+                "Copy large texts from anywhere — file names, folder names, emails, web pages, chats — and press F12. "
+                "The app scans your clipboard and detects all SKUs. The first valid one becomes your 'CURRENT SKU' so "
+                "you can act immediately, without pasting or retyping."
+            ),
+            (
+                "Open the right remote folder instantly.\n\n"
+                "With a 'CURRENT SKU' set, a click (or hotkey) jumps straight to its Google Drive folder or a mapped subfolder. "
+                "Use F1–F8 or sidebar buttons for fast, repeatable navigation—going from Vendor-ID to working context in seconds."
+            ),
+            (
+                "Save time with Favorites.\n\n"
+                "Configure per-SKU favorites (F1–F8) pointing at your most-used remote folders. "
+                "Standardize structure and eliminate repetitive wandering through deep paths."
+            ),
+            (
+                "Recent SKUs one tap away.\n\n"
+                "The side panel keeps the last SKUs you touched. Click to copy or reuse them—tooltips show full values. "
+                "You can detect and load up to 7 SKUs at once to the recents panel, and cycle through multiple SKUs quickly while tracking parallel work."
+            ),
+            (
+                "Create a local folder named “SKU + suffix.”\n\n"
+                "Generate a consistently named local folder in one step. Clean, predictable naming helps keep local workspaces tidy."
+            ),
+            (
+                "All set!\n\n"
+                "Enjoy faster, safer navigation and a reduced cognitive load. Press Finish to begin working."
+            ),
         ]
-        # Move page 7 text to page 1; shift pages 1–6 to pages 2–7
-        if len(texts) == 7:
-            texts = [texts[-1]] + texts[:-1]
-        for i in range(self._page_count):
-            idx = i + 1
+
+        self._page_count = len(texts)
+        for idx, text in enumerate(texts, start=1):
             img = self._load_image_variant(base, f'Help{idx}')
-            self._pages.append({'image': img, 'text': texts[i] if i < len(texts) else ''})
+            self._pages.append({'image': img, 'text': text})
             self._image_refs.append(img)
 
     def _load_image_variant(self, base: Path, stem: str):
@@ -159,122 +189,85 @@ class WelcomeWindow(tk.Toplevel):
         return None
 
     def _go_prev(self) -> None:
-        if self._current_page > 0:
-            self._current_page -= 1
-            self._update_page()
+        if self._current_page <= 0:
+            return
+        self._current_page -= 1
+        self._update_page()
 
     def _go_next(self) -> None:
         if self._current_page < self._page_count - 1:
             self._current_page += 1
             self._update_page()
-        else:
-            # Finish
-            try:
-                self.destroy()
-            except Exception:
-                pass
+            return
+        # Finish on last page
+        try:
+            self.destroy()
+        except Exception:
+            pass
 
     def _update_page(self) -> None:
-        # Update image
-        page = self._pages[self._current_page] if 0 <= self._current_page < len(self._pages) else None
-        img = page.get('image') if isinstance(page, dict) else None
-        txt = page.get('text') if isinstance(page, dict) else ''
-        try:
-            self._img_label.configure(image=img if img is not None else '')
-            self._img_label.image = img  # keep ref on label too
-        except Exception:
-            pass
-        try:
-            self._text_label.configure(text=str(txt or ''))
-        except Exception:
-            pass
-        # Update buttons
-        try:
-            if self._current_page == 0:
-                self._btn_prev.state(['disabled'])
-            else:
-                self._btn_prev.state(['!disabled'])
-            if self._current_page == self._page_count - 1:
-                self._btn_next.configure(text='Finish')
-            else:
-                self._btn_next.configure(text='Next')
-        except Exception:
-            pass
-        # Re-render indicators
+        if not (0 <= self._current_page < self._page_count):
+            return
+        page = self._pages[self._current_page]
+        img = page.get('image')  # type: ignore[assignment]
+        txt = page.get('text')   # type: ignore[assignment]
+        # Update widgets
+        self._img_label.configure(image=img if img else '')
+        self._img_label.image = img  # keep ref
+        self._text_label.configure(text=str(txt or ''))
+        # Buttons
+        if self._current_page == 0:
+            self._btn_prev.state(['disabled'])
+        else:
+            self._btn_prev.state(['!disabled'])
+        self._btn_next.configure(text='Finish' if self._current_page == self._page_count - 1 else 'Next')
+        # Indicators & centering
         self._render_indicators()
-        # Recenter once content settles
-        try:
-            self.after(0, self._center_once)
-        except Exception:
-            pass
+        self.after(0, self._center_once)
 
     def _render_indicators(self) -> None:
-        # Clear previous
-        for child in list(self._dots_frame.winfo_children()):
-            try:
-                child.destroy()
-            except Exception:
-                pass
-        # Draw dots as small canvases
+        # Clear existing dots
+        for child in self._dots_frame.winfo_children():
+            child.destroy()
+        pad = 6
         for i in range(self._page_count):
-            is_active = (i == self._current_page)
-            size = 12 if is_active else 8
-            pad = 6
+            active = (i == self._current_page)
+            size = 12 if active else 8
             c = tk.Canvas(self._dots_frame, width=size + pad, height=size + pad, highlightthickness=0, bd=0)
             c.pack(side='left')
             x0 = pad // 2
             y0 = pad // 2
             x1 = x0 + size
             y1 = y0 + size
-            if is_active:
-                # Outer glow (subtle)
-                try:
-                    glow_pad = 3
-                    c.create_oval(x0 - glow_pad, y0 - glow_pad, x1 + glow_pad, y1 + glow_pad, fill='#eaeaea', outline='')
-                except Exception:
-                    pass
-                # Main white circle with light outline
+            if active:
+                glow_pad = 3
+                c.create_oval(x0 - glow_pad, y0 - glow_pad, x1 + glow_pad, y1 + glow_pad, fill='#eaeaea', outline='')
                 c.create_oval(x0, y0, x1, y1, fill='#ffffff', outline='#d0d0d0')
             else:
-                # Light gray small circle
                 c.create_oval(x0, y0, x1, y1, fill='#cfcfcf', outline='#d9d9d9')
 
     def _center_once(self) -> None:
-        # Guard against repeated centering
         if getattr(self, '_centered', False):
             return
-        setattr(self, '_centered', True)
+        self._centered = True
+        self.update_idletasks()
+        w = self.winfo_reqwidth() or self.winfo_width()
+        h = self.winfo_reqheight() or self.winfo_height()
+        parent = self.master if isinstance(self.master, tk.Misc) else None
+        if parent is not None:
+            parent.update_idletasks()
+            mx, my = parent.winfo_rootx(), parent.winfo_rooty()
+            mw = parent.winfo_width() or parent.winfo_reqwidth()
+            mh = parent.winfo_height() or parent.winfo_reqheight()
+            x = mx + max((mw - w) // 2, 0)
+            y = my + max((mh - h) // 2, 0)
+        else:
+            sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+            x = max((sw - w) // 2, 0)
+            y = max((sh - h) // 2, 0)
+        self.geometry(f"{w}x{h}+{x}+{y}")
         try:
-            # Ensure widgets have computed requested size
-            self.update_idletasks()
-            w = self.winfo_reqwidth() or self.winfo_width()
-            h = self.winfo_reqheight() or self.winfo_height()
-            # Prefer centering relative to parent window coordinates
-            m = self.master if isinstance(self.master, tk.Misc) else None
-            if m is not None:
-                try:
-                    m.update_idletasks()
-                except Exception:
-                    pass
-                mx = m.winfo_rootx()
-                my = m.winfo_rooty()
-                mw = m.winfo_width() or m.winfo_reqwidth()
-                mh = m.winfo_height() or m.winfo_reqheight()
-                x = mx + max((mw - w) // 2, 0)
-                y = my + max((mh - h) // 2, 0)
-            else:
-                sw = self.winfo_screenwidth()
-                sh = self.winfo_screenheight()
-                x = max((sw - w) // 2, 0)
-                y = max((sh - h) // 2, 0)
-            self.geometry(f"{w}x{h}+{x}+{y}")
-            try:
-                self.lift()
-            except Exception:
-                pass
-            try:
-                self.focus_set()
-            except Exception:
-                pass
+            self.lift()
+            self.focus_set()
         except Exception:
             pass

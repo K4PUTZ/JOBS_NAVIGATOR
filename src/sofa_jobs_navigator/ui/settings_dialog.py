@@ -114,6 +114,14 @@ class SettingsDialog(tk.Toplevel):
         fav_frame.columnconfigure(1, weight=0)
         fav_frame.columnconfigure(2, weight=1)
         fav_frame.columnconfigure(3, weight=1)
+        # Prepare a style that blends disabled entry background with dialog background (transparent-like)
+        try:
+            style = ttk.Style(self)
+            bg = style.lookup('TFrame', 'background') or self.cget('bg') or '#f0f0f0'
+            style.configure('Sofa.Disabled.TEntry', fieldbackground=bg, background=bg, foreground='#6c757d')
+            style.map('Sofa.Disabled.TEntry', fieldbackground=[('disabled', bg)], foreground=[('disabled', '#6c757d')])
+        except Exception:
+            style = None  # type: ignore[assignment]
 
         # Header row
         ttk.Label(fav_frame, text='Relative Path:').grid(row=0, column=2, sticky='w', padx=(4, 4), pady=(0, 2))
@@ -125,8 +133,24 @@ class SettingsDialog(tk.Toplevel):
             ttk.Label(fav_frame, text='SKU/').grid(row=r, column=1, sticky='e', padx=(0, 4), pady=2)
             path_var = tk.StringVar(value=fav.path)
             label_var = tk.StringVar(value=fav.label)
-            ttk.Entry(fav_frame, textvariable=path_var, width=32).grid(row=r, column=2, sticky='ew', padx=(4, 4), pady=2)
-            ttk.Entry(fav_frame, textvariable=label_var, width=24).grid(row=r, column=3, sticky='ew', padx=(4, 0), pady=2)
+            path_entry = ttk.Entry(fav_frame, textvariable=path_var, width=32)
+            label_entry = ttk.Entry(fav_frame, textvariable=label_var, width=24)
+            # F1 is fixed to ROOT: disable both fields for reference only
+            if idx == 1:
+                try:
+                    # Show placeholder text in path, but save as root (empty) later
+                    path_var.set('F1 always opens the root folder.')
+                    # Disable and remove from focus traversal
+                    path_entry.configure(state='disabled', takefocus=0)
+                    label_entry.configure(state='disabled', takefocus=0)
+                    # Apply transparent-like style if available
+                    if style is not None:
+                        path_entry.configure(style='Sofa.Disabled.TEntry')
+                        label_entry.configure(style='Sofa.Disabled.TEntry')
+                except Exception:
+                    pass
+            path_entry.grid(row=r, column=2, sticky='ew', padx=(4, 4), pady=2)
+            label_entry.grid(row=r, column=3, sticky='ew', padx=(4, 0), pady=2)
             # Keep storage order (label, path) to satisfy save handler
             self._favorite_vars.append((label_var, path_var))
 
@@ -200,6 +224,11 @@ class SettingsDialog(tk.Toplevel):
         for idx, (label_var, path_var) in enumerate(self._favorite_vars, start=1):
             label = (label_var.get() or '').strip()
             path = (path_var.get() or '').strip()
+            # F1 is permanently ROOT: force empty path and skip warnings
+            if idx == 1:
+                path = ''
+                favorites.append(Favorite(label=label, path=path))
+                continue
             # Path but no label: block save and ask user to provide a name
             if path and not label:
                 messagebox.showerror(
@@ -232,6 +261,8 @@ class SettingsDialog(tk.Toplevel):
             connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', False),
             open_root_on_sku_found=bool(self._open_root_var.get()) if hasattr(self, '_open_root_var') else getattr(self._settings, 'open_root_on_sku_found', False),
             recent_skus=self._settings.recent_skus,
+            default_suffix=getattr(self._settings, 'default_suffix', ' - FTR '),
+            show_help_on_startup=getattr(self._settings, 'show_help_on_startup', True),
             suppress_connect_setup_prompt=False if getattr(self, '_reset_warnings_flag', False) else getattr(self._settings, 'suppress_connect_setup_prompt', False),
         )
         self._on_save(updated)
