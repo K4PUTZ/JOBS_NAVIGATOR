@@ -14,6 +14,7 @@ from .version import app_display_title
 from .config.settings import Settings, SettingsManager
 from .controls.hotkeys import HotkeyManager
 from .logging.event_log import LOGGER
+from .logging.console_file import CONSOLE_FILE_LOGGER
 from .services.auth_service import AuthService
 from .services.drive_client import DriveClient
 from .services.recent_history import RecentSKUHistory
@@ -71,6 +72,10 @@ def run() -> None:
     def update_account_label(account: str | None) -> None:
         nonlocal current_account
         current_account = account
+        try:
+            CONSOLE_FILE_LOGGER.log_account(account)
+        except Exception:
+            pass
 
     def handle_auth_connect() -> None:
         """Shared auth connection handler for both settings and welcome window."""

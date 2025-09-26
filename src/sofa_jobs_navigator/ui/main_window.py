@@ -10,6 +10,7 @@ import re
 
 from ..config.settings import Settings
 from ..config.flags import FLAGS
+from ..logging.console_file import CONSOLE_FILE_LOGGER, open_console_log_file
 
 
 # =================== MAIN WINDOW ===================
@@ -113,6 +114,22 @@ class MainWindow(ttk.Frame):
         )
         self.console_text.grid(row=0, column=0, sticky='nsew')
         self._console_scroll_y.configure(command=self.console_text.yview)
+        # Spacer and action buttons beneath the console log
+        try:
+            ttk.Frame(console_frame, height=4).grid(row=1, column=0, columnspan=2, sticky='ew')
+        except Exception:
+            pass
+        button_row = ttk.Frame(console_frame)
+        button_row.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(4, 2))
+        button_row.columnconfigure(0, weight=1)
+        try:
+            ttk.Frame(button_row).grid(row=0, column=0, sticky='ew')
+        except Exception:
+            pass
+        self._clear_console_btn = ttk.Button(button_row, text='Clear Console', command=self._clear_console)
+        self._clear_console_btn.grid(row=0, column=1, padx=(0, 6))
+        self._open_log_btn = ttk.Button(button_row, text='Log', command=self._open_console_log)
+        self._open_log_btn.grid(row=0, column=2)
         # Default console colors: white text on dark background; caret visible
         try:
             self.console_text.configure(bg='#1e1e1e', fg='#ffffff', insertbackground='#ffffff')
@@ -724,9 +741,17 @@ class MainWindow(ttk.Frame):
 
     def console_error(self, message: str) -> None:
         self.append_console(message, 'error')
+        try:
+            CONSOLE_FILE_LOGGER.log_error(message)
+        except Exception:
+            pass
 
     def console_sku_detected(self, sku: str) -> None:
         self.append_console_highlight(f'SKU detected: {sku}', highlight=sku, highlight_tag='sku')
+        try:
+            CONSOLE_FILE_LOGGER.log_sku(sku)
+        except Exception:
+            pass
 
     def console_hint(self, message: str) -> None:
         self.append_console(message, 'hint')
@@ -884,6 +909,12 @@ class MainWindow(ttk.Frame):
             self.console_text.configure(state='normal')
             self.console_text.delete('1.0', 'end')
             self.console_text.configure(state='disabled')
+        except Exception:
+            pass
+
+    def _open_console_log(self) -> None:
+        try:
+            open_console_log_file(CONSOLE_FILE_LOGGER.path)
         except Exception:
             pass
 
