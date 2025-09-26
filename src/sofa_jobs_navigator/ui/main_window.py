@@ -115,14 +115,13 @@ class MainWindow(ttk.Frame):
             self.console_text.bind('<Control-Button-1>', self._show_console_context_menu)
         except Exception:
             self._console_menu = None  # type: ignore[assignment]
-        # Console text color tags
+        # Console color tags for categorized messages
         try:
-            self.console_text.tag_configure('success', foreground='#22c55e')  # brighter green
-            self.console_text.tag_configure('error', foreground='#dc3545')    # red
-            self.console_text.tag_configure('warning', foreground='#ffc107')  # yellow
-            self.console_text.tag_configure('sku', foreground='#0dcaf0')      # cyan
-            # Hint/prompt messages: pink
-            self.console_text.tag_configure('hint', foreground='#ff69b4')     # pink (hot pink)
+            self.console_text.tag_configure('error', foreground='#dc3545')      # red
+            self.console_text.tag_configure('warning', foreground='#ffc107')    # gold yellow
+            self.console_text.tag_configure('success', foreground='#90ee90')    # light green
+            self.console_text.tag_configure('hint', foreground='#ff69b4')       # pink
+            self.console_text.tag_configure('sku', foreground='#0dcaf0')        # cyan for SKU values
         except Exception:
             pass
 
@@ -383,7 +382,7 @@ class MainWindow(ttk.Frame):
                 return
         except Exception:
             pass
-        self.append_console('Search SKU: copy a SKU and press F12 (toolbar will invoke when wired).')
+        self.console_hint('Search SKU: copy a SKU and press F12 (toolbar will invoke when wired).')
 
     def _on_tool_settings(self) -> None:
         try:
@@ -399,7 +398,7 @@ class MainWindow(ttk.Frame):
                 return
         except Exception:
             pass
-        self.append_console('About dialog is under development.')
+        # About dialog failed - no message needed
 
     def _on_tool_help(self) -> None:
         try:
@@ -408,7 +407,7 @@ class MainWindow(ttk.Frame):
                 return
         except Exception:
             pass
-        self.append_console('Help is under development.')
+        # Help dialog failed - no message needed
 
     def _on_tool_check_clipboard(self) -> None:
         # Delegate to app to inspect clipboard and print to terminal
@@ -418,7 +417,7 @@ class MainWindow(ttk.Frame):
                 return
         except Exception:
             pass
-        self.append_console('Checking clipboard for SKU… (F9)')
+        self.console_neutral('Checking clipboard for SKU… (F9)')
 
     def _render_favorites(self) -> None:
         # Clear existing
@@ -619,47 +618,17 @@ class MainWindow(ttk.Frame):
 
     # =================== CONSOLE HELPERS ===================
     def append_console(self, message: str, tag: str | None = None) -> None:
-        """Append a line to the console, optionally with a color tag.
-
-        Supported tags: 'success', 'error', 'warning'.
-        """
+        """Append a line to the console with optional color tag."""
         self.console_text.configure(state='normal')
         start_index = self.console_text.index('end-1c')
         self.console_text.insert('end', message + '\n')
         end_index = self.console_text.index('end-1c')
-        # Apply an explicit tag if provided (e.g., success/warning/error)
+        # Apply color tag if provided
         if tag:
             try:
                 self.console_text.tag_add(tag, start_index, end_index)
             except Exception:
                 pass
-        # Auto-highlight common instruction phrases (pink) without changing main text color
-        try:
-            patterns = [
-                r"Press\s+F(?:1|2|3|4|5|6|7|8|9|10|11|12)",
-                r"Press\s+Home",
-                r"Use\s+Settings",
-                r"Open\s+Settings",
-                r"Choose\s+Working\s+Folder",
-                r"Connect\s+to\s+Google\s+Drive",
-            ]
-            for pat in patterns:
-                m = re.search(pat, message, flags=re.IGNORECASE)
-                if not m:
-                    continue
-                # Highlight first match within the inserted line
-                line_text = message
-                rel_start = m.start()
-                rel_end = m.end()
-                # Compute absolute indices within the text widget
-                abs_start = f"{start_index}+{rel_start}c"
-                abs_end = f"{start_index}+{rel_end}c"
-                try:
-                    self.console_text.tag_add('hint', abs_start, abs_end)
-                except Exception:
-                    pass
-        except Exception:
-            pass
         self.console_text.configure(state='disabled')
         self.console_text.see('end')
         # Mirror console to terminal when UI diagnostics or verbose logging are enabled
@@ -670,7 +639,7 @@ class MainWindow(ttk.Frame):
             pass
 
     def append_console_highlight(self, message: str, *, highlight: str, highlight_tag: str = 'sku', line_tag: str | None = None) -> None:
-        """Append a line and apply a color tag to a substring (e.g., SKU value)."""
+        """Append a line and highlight SKU values in cyan."""
         self.console_text.configure(state='normal')
         line_start = self.console_text.index('end-1c')
         self.console_text.insert('end', message + '\n')
@@ -678,7 +647,7 @@ class MainWindow(ttk.Frame):
         try:
             if line_tag:
                 self.console_text.tag_add(line_tag, line_start, line_end)
-            # find the first occurrence of highlight between line_start and line_end
+            # Highlight the SKU value in cyan
             idx = self.console_text.search(highlight, line_start, stopindex=line_end, nocase=False)
             if idx:
                 try:
@@ -691,7 +660,7 @@ class MainWindow(ttk.Frame):
         self.console_text.configure(state='disabled')
         self.console_text.see('end')
 
-    # Convenience wrappers
+    # Convenience wrappers with color categories
     def console_success(self, message: str) -> None:
         self.append_console(message, 'success')
 
@@ -706,6 +675,10 @@ class MainWindow(ttk.Frame):
 
     def console_hint(self, message: str) -> None:
         self.append_console(message, 'hint')
+
+    def console_neutral(self, message: str) -> None:
+        """White text for neutral messages."""
+        self.append_console(message)
 
     def update_recents(self, recents: Iterable[str]) -> None:
         """Populate the recent SKU buttons.
@@ -757,7 +730,7 @@ class MainWindow(ttk.Frame):
         try:
             self.append_console_highlight(f"Copied SKU: {full}", highlight=full, highlight_tag='sku', line_tag='success')
         except Exception:
-            self.append_console(f"Copied SKU: {full}")
+            self.append_console_highlight(f"Copied SKU: {full}", highlight=full, highlight_tag='sku')
         # Show a small transient toast near the button
         try:
             btn = self._recent_buttons[index]
@@ -770,7 +743,7 @@ class MainWindow(ttk.Frame):
         if callable(self._on_clear_recents):
             try:
                 self._on_clear_recents()
-                self.append_console('Recent SKUs cleared.')
+                self.console_neutral('Recent SKUs cleared.')
             except Exception as e:
                 self.append_console(f'Failed to clear recent SKUs: {e}')
 
@@ -949,7 +922,7 @@ class MainWindow(ttk.Frame):
         except Exception:
             pass
         # Fallback: notify in console
-        self.append_console('Create SKU folder invoked (no handler wired).')
+        self.console_neutral('Create SKU folder invoked (no handler wired).')
 
     # Hotkeys intentionally not bound; recents are mouse/touch only
     def _bind_recent_hotkeys(self) -> None:

@@ -96,7 +96,7 @@ def run() -> None:
         """Shared auth clear handler for settings dialog."""
         auth_service.clear_tokens()
         update_account_label(None)
-        main_window.console_success('Cleared stored credentials.')
+        main_window.console_neutral('Cleared stored credentials.')
         try:
             main_window.set_status(online=False, account=None)
         except Exception:
@@ -119,7 +119,7 @@ def run() -> None:
         try:
             result = drive_client.resolve_relative_path(sku, favorite_path)
             LOGGER.info('Resolved path', sku=sku, path=favorite_path, folder_id=result.folder_id)
-            main_window.console_success(f"Resolved path '{favorite_path or '(root)'}' -> {result.folder_id}")
+            main_window.console_neutral(f"Resolved path '{favorite_path or '(root)'}' -> {result.folder_id}")
             # Build Google Drive URL and open in the default browser
             url = f"https://drive.google.com/drive/folders/{result.folder_id}"
             main_window.console_success(f"Opening in browser: {url}")
@@ -185,7 +185,7 @@ def run() -> None:
         try:
             main_window.console_sku_detected(sku)
         except Exception:
-            main_window.append_console(f'SKU detected: {sku}')
+            main_window.append_console_highlight(f'SKU detected: {sku}', highlight=sku, highlight_tag='sku')
         LOGGER.info('SKU detected', sku=sku)
 
         if settings.save_recent_skus:
@@ -193,7 +193,7 @@ def run() -> None:
             settings_manager.save(settings)
         main_window.update_recents(recent_history.items())
         # No secondary window; use Favorites panel or press F1–F8 to open a favorite
-        main_window.console_success('Choose a Favorite on the right (or press F1–F8).')
+        main_window.console_hint('Choose a Favorite on the right (or press F1–F8).')
         last_sku = sku
         try:
             main_window.set_current_sku(sku)
@@ -207,7 +207,7 @@ def run() -> None:
                 try:
                     result = drive_client.resolve_relative_path(sku, '')
                     url = f"https://drive.google.com/drive/folders/{result.folder_id}"
-                    main_window.console_success(f"Opening SKU root in browser: {url}")
+                    main_window.console_neutral(f"Opening SKU root in browser: {url}")
                     try:
                         opened = webbrowser.open(url, new=2)
                         if not opened:
@@ -354,7 +354,7 @@ def run() -> None:
                             highlight_tag='sku'
                         )
                     except Exception:
-                        main_window.append_console(f"SKU: {r.sku}  @[{r.start}:{r.end}]  context='{r.context}'")
+                        main_window.append_console_highlight(f"SKU: {r.sku}  @[{r.start}:{r.end}]  context='{r.context}'", highlight=r.sku, highlight_tag='sku')
                 try:
                     sound_player.play_success()
                 except Exception:
@@ -376,10 +376,8 @@ def run() -> None:
         try:
             AboutWindow(root)
         except Exception:
-            try:
-                main_window.append_console('About dialog is under development.')
-            except Exception:
-                pass
+            # About dialog failed to open - fail silently
+            pass
 
     def on_help_action() -> None:
         try:
@@ -392,10 +390,8 @@ def run() -> None:
                 save_settings=save_settings_callback,
             )
         except Exception:
-            try:
-                main_window.append_console('Help is under development.')
-            except Exception:
-                pass
+            # Help dialog failed to open - fail silently
+            pass
 
 
                 
@@ -693,9 +689,9 @@ def run() -> None:
                     main_window.console_warning('No additional SKUs to load into Recents.')
                 else:
                     if total_candidates > loaded_count:
-                        main_window.console_success(f'Loaded {loaded_count} SKUs into Recents (of {total_candidates} available).')
+                        main_window.console_neutral(f'Loaded {loaded_count} SKUs into Recents (of {total_candidates} available).')
                     else:
-                        main_window.console_success(f'Loaded {loaded_count} SKUs into Recents.')
+                        main_window.console_neutral(f'Loaded {loaded_count} SKUs into Recents.')
             except Exception:
                 pass
         except Exception:
