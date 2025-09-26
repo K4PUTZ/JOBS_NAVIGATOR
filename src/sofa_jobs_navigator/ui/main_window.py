@@ -33,6 +33,7 @@ class MainWindow(ttk.Frame):
         on_help: Callable[[], None] | None = None,
         on_create_sku_folder: Callable[[str], None] | None = None,
         on_settings_change: Callable[[Settings], None] | None = None,
+        on_clear_recents: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(master, padding=12)
         self._settings = settings
@@ -44,6 +45,7 @@ class MainWindow(ttk.Frame):
         self._on_about = on_about
         self._on_help = on_help
         self._on_create_sku_folder = on_create_sku_folder
+        self._on_clear_recents = on_clear_recents
         # Favorites are disabled until a SKU is detected
         self._favorites_enabled: bool = False
         self._build_ui()
@@ -258,7 +260,16 @@ class MainWindow(ttk.Frame):
         self._favorite_buttons: list[ttk.Button] = []
         self._render_favorites()
 
-        ttk.Label(sidebar, text='Recent SKUs').pack(anchor='w')
+        # Recent SKUs header with Clear button
+        recents_header = ttk.Frame(sidebar)
+        recents_header.pack(fill='x', anchor='w')
+        ttk.Label(recents_header, text='Recent SKUs').pack(side='left', anchor='w')
+        ttk.Button(
+            recents_header, 
+            text='Clear', 
+            command=self._on_clear_recents_click,
+            width=6
+        ).pack(side='right', anchor='e')
         # Recent SKUs: up to 7 copy buttons with dark tooltips
         self._recents_rows = ttk.Frame(sidebar)
         # Use grid inside recents so labels/buttons align across rows
@@ -753,6 +764,15 @@ class MainWindow(ttk.Frame):
             self._show_toast(btn, 'Copied!', duration_ms=900)
         except Exception:
             pass
+
+    def _on_clear_recents_click(self) -> None:
+        """Handle clicking the Clear button for recent SKUs."""
+        if callable(self._on_clear_recents):
+            try:
+                self._on_clear_recents()
+                self.append_console('Recent SKUs cleared.')
+            except Exception as e:
+                self.append_console(f'Failed to clear recent SKUs: {e}')
 
     def _copy_to_clipboard(self, text: str) -> None:
         try:

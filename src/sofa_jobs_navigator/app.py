@@ -400,6 +400,12 @@ def run() -> None:
 
                 
 
+    def clear_recent_skus() -> None:
+        """Clear the recent SKU history."""
+        recent_history.clear()
+        settings_manager.save(settings)
+        main_window.update_recents([])
+
     main_window = MainWindow(
         root,
         settings=settings,
@@ -411,6 +417,7 @@ def run() -> None:
         on_help=on_help_action,
         on_create_sku_folder=on_create_sku_folder,
         on_settings_change=lambda s: settings_manager.save(s),
+        on_clear_recents=clear_recent_skus,
     )
     # Ensure window is large enough to accommodate all UI elements
     try:
