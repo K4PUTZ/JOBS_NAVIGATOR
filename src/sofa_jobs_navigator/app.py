@@ -675,15 +675,7 @@ def run() -> None:
                 skip_prompt = bool(getattr(settings, 'auto_load_multi_skus_without_prompt', False))
             except Exception:
                 skip_prompt = False
-            ok = True
-            if not skip_prompt:
-                try:
-                    prompt_msg = 'Load additional found SKUs into Recents?'
-                    ok = messagebox.askyesno(title='Load Recents', message=prompt_msg)
-                except Exception:
-                    ok = False
-            if not ok:
-                return
+            # Build unique list (preserving order) before prompting so we can display it
             found_skus = [r.sku for r in results]
             seen = set()
             unique: list[str] = []
@@ -691,11 +683,40 @@ def run() -> None:
                 if s not in seen:
                     seen.add(s)
                     unique.append(s)
-            # Exclude first processed if provided
             if first_processed:
                 unique_no_first = [s for s in unique if s != first_processed]
             else:
                 unique_no_first = unique
+            # Console listing before asking
+            try:
+                if first_processed:
+                    if unique_no_first:
+                        main_window.append_console(
+                            'Additional SKUs detected: ' + ', '.join(unique_no_first)
+                        )
+                    else:
+                        # Nothing new beyond the first one
+                        main_window.append_console('No additional unique SKUs beyond the first detected.')
+                else:
+                    # We're not excluding a first processed SKU (e.g. clipboard scan path)
+                    main_window.append_console(
+                        'Multiple SKUs detected: ' + ', '.join(unique)
+                    )
+            except Exception:
+                pass
+            ok = True
+            if not skip_prompt:
+                try:
+                    prompt_msg = 'Load additional found SKUs into Recents?'
+                    # Only show prompt if there is something new to add
+                    if unique_no_first:
+                        ok = messagebox.askyesno(title='Load Recents', message=prompt_msg)
+                    else:
+                        ok = False
+                except Exception:
+                    ok = False
+            if not ok:
+                return
             to_add = unique_no_first[:7]
             for sku in reversed(to_add):
                 try:
