@@ -36,6 +36,8 @@ class Settings:
     prompt_for_connect_on_startup: bool = True
     # If True, after a successful startup connect (auto or prompted) perform a clipboard SKU auto-search
     auto_search_clipboard_after_connect: bool = False
+    # If True, when multiple SKUs are detected they are auto-loaded into Recents (up to 7) without prompting
+    auto_load_multi_skus_without_prompt: bool = False
     # When enabled, automatically open the SKU root in the browser when a SKU is found
     open_root_on_sku_found: bool = False
     recent_skus: List[str] = field(default_factory=list)
@@ -70,6 +72,7 @@ class SettingsManager:
             connect_on_startup=raw.get('connect_on_startup', False),
             prompt_for_connect_on_startup=raw.get('prompt_for_connect_on_startup', True),
             auto_search_clipboard_after_connect=raw.get('auto_search_clipboard_after_connect', False),
+            auto_load_multi_skus_without_prompt=raw.get('auto_load_multi_skus_without_prompt', False),
             open_root_on_sku_found=raw.get('open_root_on_sku_found', False),
             recent_skus=raw.get('recent_skus', []),
             show_help_on_startup=raw.get('show_help_on_startup', True),
@@ -89,6 +92,7 @@ class SettingsManager:
             'connect_on_startup': settings.connect_on_startup,
             'prompt_for_connect_on_startup': getattr(settings, 'prompt_for_connect_on_startup', True),
             'auto_search_clipboard_after_connect': getattr(settings, 'auto_search_clipboard_after_connect', False),
+            'auto_load_multi_skus_without_prompt': getattr(settings, 'auto_load_multi_skus_without_prompt', False),
             'open_root_on_sku_found': getattr(settings, 'open_root_on_sku_found', False),
             'recent_skus': settings.recent_skus,
             'show_help_on_startup': settings.show_help_on_startup,

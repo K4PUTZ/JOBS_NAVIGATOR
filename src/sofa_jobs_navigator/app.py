@@ -670,11 +670,18 @@ def run() -> None:
         try:
             if not results or len(results) <= 1:
                 return
+            # Determine if prompt should be skipped
             try:
-                prompt_msg = 'Load additional found SKUs into Recents?'
-                ok = messagebox.askyesno(title='Load Recents', message=prompt_msg)
+                skip_prompt = bool(getattr(settings, 'auto_load_multi_skus_without_prompt', False))
             except Exception:
-                ok = False
+                skip_prompt = False
+            ok = True
+            if not skip_prompt:
+                try:
+                    prompt_msg = 'Load additional found SKUs into Recents?'
+                    ok = messagebox.askyesno(title='Load Recents', message=prompt_msg)
+                except Exception:
+                    ok = False
             if not ok:
                 return
             found_skus = [r.sku for r in results]
@@ -701,7 +708,16 @@ def run() -> None:
                 pass
             try:
                 main_window.update_recents(recent_history.items())
-                main_window.console_success('Loaded found SKUs into Recents.')
+                loaded_count = len(to_add)
+                total_candidates = len(unique_no_first)
+                if loaded_count == 0:
+                    # Nothing new to add
+                    main_window.console_warning('No additional SKUs to load into Recents.')
+                else:
+                    if total_candidates > loaded_count:
+                        main_window.console_success(f'Loaded {loaded_count} SKUs into Recents (of {total_candidates} available).')
+                    else:
+                        main_window.console_success(f'Loaded {loaded_count} SKUs into Recents.')
             except Exception:
                 pass
         except Exception:

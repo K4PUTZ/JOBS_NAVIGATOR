@@ -98,14 +98,21 @@ class SettingsDialog(tk.Toplevel):
         _cb_auto_search = ttk.Checkbutton(auto_row, variable=self._auto_search_after_var)
         _cb_auto_search.pack(side='left', padx=(0, 6))
         ttk.Label(auto_row, text='Auto-search clipboard after connect.').pack(side='left')
-        # 5) Open root folder on SKU found (existing option)
+        # 5) Auto-load multi SKUs without prompt
+        multi_row = ttk.Frame(header)
+        multi_row.pack(anchor='w', pady=(2, 2))
+        self._auto_load_multi_var = tk.BooleanVar(value=bool(getattr(self._settings, 'auto_load_multi_skus_without_prompt', False)))
+        _cb_auto_load_multi = ttk.Checkbutton(multi_row, variable=self._auto_load_multi_var)
+        _cb_auto_load_multi.pack(side='left', padx=(0, 6))
+        ttk.Label(multi_row, text='Auto-load multiple SKUs (no prompt).').pack(side='left')
+        # 6) Open root folder on SKU found (existing option)
         open_row = ttk.Frame(header)
         open_row.pack(anchor='w', pady=(2, 6))
         self._open_root_var = tk.BooleanVar(value=bool(getattr(self._settings, 'open_root_on_sku_found', False)))
         _cb_open_root = ttk.Checkbutton(open_row, variable=self._open_root_var)
         _cb_open_root.pack(side='left', padx=(0, 6))
         ttk.Label(open_row, text='Open root folder on SKU found.').pack(side='left')
-        # 4) Reset warnings (another line down)
+        # 7) Reset warnings (another line down)
         reset_row = ttk.Frame(header)
         reset_row.pack(anchor='w', pady=(2, 6))
         ttk.Button(reset_row, text='Reset warnings', command=self._on_reset_warnings).pack(side='left')
@@ -275,6 +282,7 @@ class SettingsDialog(tk.Toplevel):
             connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', False),
             prompt_for_connect_on_startup=bool(self._prompt_connect_var.get()) if hasattr(self, '_prompt_connect_var') else getattr(self._settings, 'prompt_for_connect_on_startup', True),
             auto_search_clipboard_after_connect=bool(self._auto_search_after_var.get()) if hasattr(self, '_auto_search_after_var') else getattr(self._settings, 'auto_search_clipboard_after_connect', False),
+            auto_load_multi_skus_without_prompt=bool(self._auto_load_multi_var.get()) if hasattr(self, '_auto_load_multi_var') else getattr(self._settings, 'auto_load_multi_skus_without_prompt', False),
             open_root_on_sku_found=bool(self._open_root_var.get()) if hasattr(self, '_open_root_var') else getattr(self._settings, 'open_root_on_sku_found', False),
             recent_skus=self._settings.recent_skus,
             default_suffix=getattr(self._settings, 'default_suffix', ' - FTR '),
