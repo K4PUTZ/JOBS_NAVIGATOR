@@ -232,22 +232,26 @@ class WelcomeWindow(tk.Toplevel):
                         )
         except Exception:
             pass
-        # Persist toggles on final page
+                # Persist all staged settings on final page (collected from all pages)
         if self._current_page == self._page_count - 1 and self._settings is not None:
             try:
-                # Save all comprehensive settings from page 7
-                if hasattr(self, '_sounds_var'):
-                    self._settings.sounds_enabled = bool(self._sounds_var.get())
+                # Save settings from distributed pages:
+                # Page 1: Connect on Startup
                 if hasattr(self, '_connect_var'):
                     self._settings.connect_on_startup = bool(self._connect_var.get())
-                if hasattr(self, '_prompt_connect_var'):
-                    self._settings.prompt_for_connect_on_startup = bool(self._prompt_connect_var.get())
+                # Page 2: Auto-search clipboard after connect  
                 if hasattr(self, '_auto_search_after_var'):
                     self._settings.auto_search_clipboard_after_connect = bool(self._auto_search_after_var.get())
-                if hasattr(self, '_auto_load_multi_var'):
-                    self._settings.auto_load_multi_skus_without_prompt = bool(self._auto_load_multi_var.get())
+                # Page 3: Open root folder on SKU found
                 if hasattr(self, '_open_root_var'):
                     self._settings.open_root_on_sku_found = bool(self._open_root_var.get())
+                # Page 5: Auto-load multiple SKUs
+                if hasattr(self, '_auto_load_multi_var'):
+                    self._settings.auto_load_multi_skus_without_prompt = bool(self._auto_load_multi_var.get())
+                # Page 7: Sounds On only (Prompt to connect removed as requested)
+                if hasattr(self, '_sounds_var'):
+                    self._settings.sounds_enabled = bool(self._sounds_var.get())
+                
                 if callable(self._cb_save_settings):
                     self._cb_save_settings()
             except Exception:
@@ -300,7 +304,7 @@ class WelcomeWindow(tk.Toplevel):
         for child in list(self._extra_frame.winfo_children()):
             child.destroy()
         p = self._current_page
-        if p not in (0, 3, 5, 6):
+        if p not in (0, 1, 2, 3, 4, 5, 6):
             return
         for _ in range(2):
             ttk.Frame(self._extra_frame, height=8).pack(fill='x')
@@ -317,10 +321,42 @@ class WelcomeWindow(tk.Toplevel):
                 
                 # Configure button appearance based on connection status
                 self._update_connect_button_appearance()
+                
+                # Add Connect on Startup checkbox (centered below)
+                connect_cb_frame = ttk.Frame(self._extra_frame)
+                connect_cb_frame.pack(pady=(8, 0))
+                connect_default = True  # Default to True in Welcome
+                self._connect_var = tk.BooleanVar(value=connect_default)
+                ttk.Checkbutton(connect_cb_frame, variable=self._connect_var).pack(side='left', padx=(0, 6))
+                ttk.Label(connect_cb_frame, text='Connect on Startup').pack(side='left')
+            elif p == 1:
+                # Add Auto Search clipboard checkbox to page 2 (centered)
+                auto_search_cb_frame = ttk.Frame(self._extra_frame)
+                auto_search_cb_frame.pack()
+                auto_search_default = True  # Default to True in Welcome
+                self._auto_search_after_var = tk.BooleanVar(value=auto_search_default)
+                ttk.Checkbutton(auto_search_cb_frame, variable=self._auto_search_after_var).pack(side='left', padx=(0, 6))
+                ttk.Label(auto_search_cb_frame, text='Auto-search clipboard after connect').pack(side='left')
+            elif p == 2:
+                # Add Auto open root checkbox to page 3 (centered)
+                auto_open_cb_frame = ttk.Frame(self._extra_frame)
+                auto_open_cb_frame.pack()
+                auto_open_default = False  # Default to False
+                self._open_root_var = tk.BooleanVar(value=auto_open_default)
+                ttk.Checkbutton(auto_open_cb_frame, variable=self._open_root_var).pack(side='left', padx=(0, 6))
+                ttk.Label(auto_open_cb_frame, text='Open root folder on SKU found').pack(side='left')
             elif p == 3:
                 row = ttk.Frame(self._extra_frame); row.pack()
                 ttk.Label(row, text='You can set your favorite shortcuts in the settings now, or press F11 later.').pack(side='left')
                 ttk.Button(row, text='Set Favorites', command=self._on_press_open_settings).pack(side='left', padx=(12, 0))
+            elif p == 4:
+                # Add Auto load multiple checkbox to page 5 (centered)
+                auto_load_cb_frame = ttk.Frame(self._extra_frame)
+                auto_load_cb_frame.pack()
+                auto_load_default = False  # Default to False
+                self._auto_load_multi_var = tk.BooleanVar(value=auto_load_default)
+                ttk.Checkbutton(auto_load_cb_frame, variable=self._auto_load_multi_var).pack(side='left', padx=(0, 6))
+                ttk.Label(auto_load_cb_frame, text='Auto-load multiple SKUs (no prompt)').pack(side='left')
             elif p == 5:
                 ttk.Label(self._extra_frame, text='Choose your Working Folder, where you keep your projects:').pack(anchor='w')
                 browse = ttk.Frame(self._extra_frame); browse.pack(fill='x', pady=(4, 0))
@@ -338,62 +374,17 @@ class WelcomeWindow(tk.Toplevel):
                 # Store the actual path separately for validation
                 self._actual_wf_path = current
             elif p == 6:
-                # Set default values for Welcome Window (different from normal settings defaults)
-                # Welcome defaults: sounds=True, connect=True, prompt=True, auto_search=True, auto_load=False, open_root=False
-                sounds = bool(getattr(self._settings, 'sounds_enabled', True)) if self._settings else True
-                connect = True  # Default to True in Welcome (user already went through connection)
-                prompt_connect = bool(getattr(self._settings, 'prompt_for_connect_on_startup', True)) if self._settings else True
-                auto_search_after = True  # Default to True in Welcome (regardless of current settings)
-                auto_load_multi = bool(getattr(self._settings, 'auto_load_multi_skus_without_prompt', False)) if self._settings else False
-                open_root = bool(getattr(self._settings, 'open_root_on_sku_found', False)) if self._settings else False
+                # Page 7: Final settings page with remaining controls (only Sounds On)
+                # Initialize variables for any controls not yet created on other pages
+                if not hasattr(self, '_sounds_var'):
+                    sounds_default = True
+                    self._sounds_var = tk.BooleanVar(value=sounds_default)
                 
-                # Create variables
-                self._sounds_var = tk.BooleanVar(value=sounds)
-                self._connect_var = tk.BooleanVar(value=connect)
-                self._prompt_connect_var = tk.BooleanVar(value=prompt_connect)
-                self._auto_search_after_var = tk.BooleanVar(value=auto_search_after)
-                self._auto_load_multi_var = tk.BooleanVar(value=auto_load_multi)
-                self._open_root_var = tk.BooleanVar(value=open_root)
-                
-                # Create two-column layout
-                cols_frame = ttk.Frame(self._extra_frame)
-                cols_frame.pack(fill='x', pady=(4, 0))
-                
-                # Left column (3 controls)
-                left_col = ttk.Frame(cols_frame)
-                left_col.pack(side='left', fill='both', expand=True, padx=(0, 12))
-                
-                # Right column (3 controls)
-                right_col = ttk.Frame(cols_frame)
-                right_col.pack(side='left', fill='both', expand=True)
-                
-                # Left column controls
-                left_controls = [
-                    ('Sounds On', self._sounds_var),
-                    ('Connect on Startup', self._connect_var),
-                    ('Prompt to connect on Startup', self._prompt_connect_var),
-                ]
-                
-                # Right column controls
-                right_controls = [
-                    ('Auto-search clipboard after connect', self._auto_search_after_var),
-                    ('Auto-load multiple SKUs (no prompt)', self._auto_load_multi_var),
-                    ('Open root folder on SKU found', self._open_root_var),
-                ]
-                
-                # Render left column
-                for text, var in left_controls:
-                    cb_frame = ttk.Frame(left_col)
-                    cb_frame.pack(anchor='w', pady=(2, 2))
-                    ttk.Checkbutton(cb_frame, variable=var).pack(side='left', padx=(0, 6))
-                    ttk.Label(cb_frame, text=text).pack(side='left')
-                
-                # Render right column
-                for text, var in right_controls:
-                    cb_frame = ttk.Frame(right_col)
-                    cb_frame.pack(anchor='w', pady=(2, 2))
-                    ttk.Checkbutton(cb_frame, variable=var).pack(side='left', padx=(0, 6))
-                    ttk.Label(cb_frame, text=text).pack(side='left')
+                # Center the Sounds control on page 7
+                sounds_cb_frame = ttk.Frame(self._extra_frame)
+                sounds_cb_frame.pack()
+                ttk.Checkbutton(sounds_cb_frame, variable=self._sounds_var).pack(side='left', padx=(0, 6))
+                ttk.Label(sounds_cb_frame, text='Sounds On').pack(side='left')
         except Exception:
             pass
         for _ in range(2):
