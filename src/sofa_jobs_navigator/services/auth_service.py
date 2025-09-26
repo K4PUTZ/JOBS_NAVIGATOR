@@ -12,7 +12,25 @@ try:
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
 except Exception:  # pragma: no cover - optional dependency
-    Request = Credentials = InstalledAppFlow = None  # type: ignore
+    Request = None  # type: ignore
+    AuthorizedSession = None  # type: ignore
+
+    class Credentials:  # type: ignore
+        """Stub Credentials class used when google-auth libraries are unavailable.
+
+        Only attributes accessed in guarded code paths are declared for type compatibility.
+        """
+        valid: bool = False
+        expired: bool = True
+        refresh_token: str | None = None
+
+        def has_scopes(self, _scopes) -> bool:  # type: ignore[override]
+            return False
+
+    class InstalledAppFlow:  # type: ignore
+        @classmethod
+        def from_client_secrets_file(cls, *_args, **_kwargs):  # type: ignore[override]
+            raise RuntimeError("Google authentication libraries are not installed.")
 
 from platformdirs import user_config_path
 
@@ -99,6 +117,33 @@ class AuthService:
             self._token_path.unlink()
         if self._account_path.exists():
             self._account_path.unlink()
+
+    # Lightweight inspection helpers (do not trigger interactive auth)
+    def has_valid_credentials(self) -> bool:
+        """Return True if a cached credential exists, is valid, and has required scopes.
+
+        This method is non-interactive: it will NOT refresh or launch a browser. Expired
+        or scope-mismatched credentials return False so the caller can decide to prompt.
+        """
+        if self._flags.offline_mode:
+            return False
+        # Reuse already loaded credentials if present
+        if not self._creds:
+            try:
+                self._creds = self._load_cached_credentials()
+            except Exception:
+                self._creds = None
+        c = self._creds
+        if not c:
+            return False
+        try:
+            if not c.valid:
+                return False
+            if hasattr(c, 'has_scopes') and not c.has_scopes(SCOPES):  # type: ignore[attr-defined]
+                return False
+            return True
+        except Exception:
+            return False
 
     # Expose account info helpers
     def get_account_email(self, creds: Optional[Credentials] = None) -> Optional[str]:

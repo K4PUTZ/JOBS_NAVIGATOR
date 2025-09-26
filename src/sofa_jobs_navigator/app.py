@@ -503,22 +503,24 @@ def run() -> None:
     except Exception:
         pass
 
-    # Attempt to auto-connect on startup (respect offline flag)
+    # Attempt to auto-connect ONLY when valid cached credentials exist and user enabled setting
     def _attempt_auto_connect() -> None:
         if FLAGS.offline_mode:
             return
-        # Respect user setting for auto-connect; default is OFF
         try:
             if not bool(getattr(settings, 'connect_on_startup', False)):
                 LOGGER.info('auth.auto_connect_disabled_by_setting')
                 return
         except Exception:
             pass
+        # Ensure we have valid cached credentials (non-interactive check)
+        if not auth_service.has_valid_credentials():
+            LOGGER.info('auth.auto_connect_skipped_no_valid_cached_creds')
+            return
         try:
             creds = auth_service.ensure_authenticated()
             email = auth_service.get_account_email(creds) or getattr(creds, 'service_account_email', None) or getattr(creds, 'client_id', None)
             update_account_label(email)
-            # Enable online Drive service immediately
             drive_client._service_factory = lambda: GoogleDriveService(creds)  # type: ignore[attr-defined]
             main_window.console_success('Auto-connected to Google Drive')
             try:
@@ -527,90 +529,60 @@ def run() -> None:
             except Exception:
                 pass
             LOGGER.info('auth.auto_connected', account=email)
-            # After successful auto-connect, perform a clipboard check by default
-            try:
-                txt = clipboard.read_text()
-            except Exception:
-                txt = ''
-            results = []
-            try:
-                results = DEFAULT_DETECTOR.find_all(txt or '')
-            except Exception:
-                results = []
-            try:
-                if not results:
-                    main_window.console_warning('No SKU found in clipboard after auto-connect.')
-                else:
-                    # Inform user about findings
-                    if len(results) == 1:
-                        main_window.console_success('Auto-connect clipboard check: 1 SKU found. Running search...')
-                    else:
-                        main_window.console_warning(f'Auto-connect clipboard check: {len(results)} SKUs found. Using the first; you can load others to Recents.')
-                    # Autosearch using the first SKU
-                    try:
-                        # Set clipboard to the first SKU so handle_launch picks it
-                        first_sku = results[0].sku
-                        try:
-                            # Ensure UI clipboard updated
-                            root.clipboard_clear()
-                            root.clipboard_append(first_sku)
-                            root.update_idletasks()
-                        except Exception:
-                            pass
-                        # Also set current SKU visual hint early (best-effort)
-                        try:
-                            main_window.set_current_sku(first_sku)
-                        except Exception:
-                            pass
-                        handle_launch(None)
-                    except Exception:
-                        pass
-                    # If more than one, ask to load up to first 7 into recents (preserve order)
-                    if len(results) > 1:
-                        try:
-                            ok = messagebox.askyesno(
-                                title='Load Recents',
-                                message='Load the first seven found SKUs into Recents?'
-                            )
-                        except Exception:
-                            ok = False
-                        if ok:
-                            try:
-                                found_skus = [r.sku for r in results]
-                                # Ensure uniqueness while preserving order
-                                seen = set()
-                                unique_skus: list[str] = []
-                                for s in found_skus:
-                                    if s not in seen:
-                                        seen.add(s)
-                                        unique_skus.append(s)
-                                # Keep first up to 7; ensure the first one (already searched) is included at the head
-                                to_add = unique_skus[:7]
-                                # Populate recent history accordingly (most recent first semantics)
-                                # We'll add in reverse so that the first remains the most recent
-                                for sku in reversed(to_add):
-                                    try:
-                                        recent_history.add(sku)
-                                    except Exception:
-                                        pass
-                                # Persist and refresh
-                                try:
-                                    settings_manager.save(settings)
-                                except Exception:
-                                    pass
-                                main_window.update_recents(recent_history.items())
-                                main_window.console_success('Loaded found SKUs into Recents.')
-                            except Exception:
-                                pass
-            except Exception:
-                pass
         except Exception:
-            # Stay silent; user can connect manually or via setup prompt
-            LOGGER.info('auth.auto_connect_skipped')
+            LOGGER.info('auth.auto_connect_failed')
+
+    def _startup_auth_flow() -> None:
+        """Startup credential check/prompt before attempting auto-connect.
+
+        Behavior:
+        - If offline mode: do nothing.
+        - If valid cached credentials and user enabled auto-connect: connect automatically.
+        - If no valid credentials: prompt user to connect now. On decline, warn in console.
+        """
+        if FLAGS.offline_mode:
+            return
+        try:
+            if auth_service.has_valid_credentials():
+                # Only proceed automatically if user opted in via settings
+                if bool(getattr(settings, 'connect_on_startup', False)):
+                    _attempt_auto_connect()
+                else:
+                    LOGGER.info('auth.valid_cached_creds_startup_no_autoconnect')
+                return
+        except Exception:
+            pass
+        # No valid credentials; ask user
+        try:
+            ok = messagebox.askyesno(
+                title='Connect to Google Drive?',
+                message='You are not connected to Google Drive yet. Connect now?'
+            )
+        except Exception:
+            ok = False
+        if ok:
+            try:
+                creds = auth_service.ensure_authenticated()
+                email = auth_service.get_account_email(creds) or getattr(creds, 'service_account_email', None) or getattr(creds, 'client_id', None)
+                update_account_label(email)
+                drive_client._service_factory = lambda: GoogleDriveService(creds)  # type: ignore[attr-defined]
+                main_window.console_success('Connected to Google Drive.')
+                try:
+                    expiry = auth_service.get_token_expiry_iso(creds)
+                    main_window.set_status(online=True, account=email, token_expiry_iso=expiry)
+                except Exception:
+                    pass
+                LOGGER.info('auth.connected.startup_prompt', account=email)
+            except Exception as exc:
+                main_window.console_error(f'Auth failed: {exc}')
+                LOGGER.error('auth.failed.startup_prompt', error=str(exc))
+        else:
+            main_window.console_warning('Not connected. Press F11 to connect to Google Drive.')
+            LOGGER.info('auth.startup_user_declined')
 
     try:
-        # Schedule shortly after UI shows to avoid blocking initial render
-        root.after(250, _attempt_auto_connect)
+        # Schedule startup auth decision flow (includes optional auto-connect)
+        root.after(250, _startup_auth_flow)
     except Exception:
         pass
 
