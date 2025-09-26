@@ -42,8 +42,6 @@ class Settings:
     open_root_on_sku_found: bool = False
     recent_skus: List[str] = field(default_factory=list)
     show_help_on_startup: bool = True
-    # When True, suppress the startup prompt to open Help after a failed auto-connect
-    suppress_connect_setup_prompt: bool = False
 
 
 # =================== SETTINGS MANAGER ===================
@@ -76,7 +74,6 @@ class SettingsManager:
             open_root_on_sku_found=raw.get('open_root_on_sku_found', False),
             recent_skus=raw.get('recent_skus', []),
             show_help_on_startup=raw.get('show_help_on_startup', True),
-            suppress_connect_setup_prompt=raw.get('suppress_connect_setup_prompt', False),
         )
 
     def save(self, settings: Settings) -> None:
@@ -96,7 +93,6 @@ class SettingsManager:
             'open_root_on_sku_found': getattr(settings, 'open_root_on_sku_found', False),
             'recent_skus': settings.recent_skus,
             'show_help_on_startup': settings.show_help_on_startup,
-            'suppress_connect_setup_prompt': getattr(settings, 'suppress_connect_setup_prompt', False),
         }
         with self._config_path.open('w', encoding='utf-8') as fh:
             json.dump(payload, fh, indent=2)

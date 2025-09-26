@@ -397,98 +397,8 @@ def run() -> None:
             except Exception:
                 pass
 
-    def _prompt_connect_setup() -> None:
-        """Ask the user if they want to open Help after auto-connect failure.
 
-        Includes a 'Don't show again' checkbox tied to settings.suppress_connect_setup_prompt
-        and the Reset warnings button in Settings.
-        """
-        try:
-            # Build a custom dialog to include a checkbox
-            dlg = tk.Toplevel(root)
-            dlg.title('Setup Google Drive?')
-            dlg.transient(root)
-            dlg.grab_set()
-            try:
-                set_app_icon(dlg)
-            except Exception:
-                pass
-            frm = tk.Frame(dlg, padx=12, pady=12)
-            frm.pack(fill='both', expand=True)
-            msg = tk.Label(
-                frm,
-                text='It looks like you are not connected to Google Drive,\nwould you like to set up the program now?'
-            )
-            msg.pack(anchor='w')
-            dont_var = tk.BooleanVar(value=False)
-            chk = tk.Checkbutton(frm, text="Don't show again", variable=dont_var)
-            chk.pack(anchor='w', pady=(8, 0))
-            btns = tk.Frame(frm)
-            btns.pack(fill='x', pady=(12, 0))
-            result = {'ok': False}
-
-            def on_yes():
-                result['ok'] = True
-                dlg.destroy()
-
-            def on_no():
-                result['ok'] = False
-                dlg.destroy()
-
-            tk.Button(btns, text='Yes', command=on_yes).pack(side='right')
-            tk.Button(btns, text='No', command=on_no).pack(side='right', padx=(0, 6))
-
-            # Center the dialog
-            try:
-                dlg.update_idletasks()
-                w = dlg.winfo_width() or dlg.winfo_reqwidth()
-                h = dlg.winfo_height() or dlg.winfo_reqheight()
-                sw = dlg.winfo_screenwidth()
-                sh = dlg.winfo_screenheight()
-                x = max((sw // 2) - (w // 2), 0)
-                y = max((sh // 2) - (h // 2), 0)
-                dlg.geometry(f"{w}x{h}+{x}+{y}")
-            except Exception:
-                pass
-            dlg.wait_window()
-            # Persist suppression choice if checked
-            try:
-                if bool(dont_var.get()):
-                    setattr(settings, 'suppress_connect_setup_prompt', True)
-                    settings_manager.save(settings)
-            except Exception:
-                pass
-            # Open Help when user accepts
-            if result['ok']:
-                try:
-                    WelcomeWindow(
-                        root,
-                        settings=settings,
-                        on_auth_connect=handle_auth_connect,
-                        on_open_settings=on_open_settings,
-                        is_connected=is_connected,
-                        save_settings=save_settings_callback,
-                    )
-                except Exception:
-                    pass
-        except Exception:
-            # Fallback to simple Yes/No without checkbox
-            try:
-                ok = messagebox.askyesno(
-                    title='Setup Google Drive?',
-                    message='It looks like you are not connected to Google Drive, would you like to set up the program now?'
-                )
-                if ok:
-                    WelcomeWindow(
-                        root,
-                        settings=settings,
-                        on_auth_connect=handle_auth_connect,
-                        on_open_settings=on_open_settings,
-                        is_connected=is_connected,
-                        save_settings=save_settings_callback,
-                    )
-            except Exception:
-                pass
+                
 
     main_window = MainWindow(
         root,
@@ -789,18 +699,14 @@ def run() -> None:
     # - user is not connected
     # - suppression flag is not enabled
     def _maybe_prompt_setup() -> None:
-        try:
-            wf = (getattr(settings, 'working_folder', None) or '').strip()
-        except Exception:
-            wf = ''
-        try:
-            suppressed = bool(getattr(settings, 'suppress_connect_setup_prompt', False))
-        except Exception:
-            suppressed = False
-        # Determine if we're online by checking if a service factory was injected via auth flow
-        online = drive_client._service_factory is not None  # type: ignore[attr-defined]
-        if not wf and not online and not suppressed:
-            _prompt_connect_setup()
+        # Show Welcome Window on first run (when show_help_on_startup is True)
+        if getattr(settings, 'show_help_on_startup', True):
+            try:
+                welcome = WelcomeWindow(root, settings)
+                root.wait_window(welcome)
+            except Exception as e:
+                LOGGER.error('welcome_window.error', error=str(e))
+                # Continue silently if Welcome Window fails
 
     try:
         root.after(500, _maybe_prompt_setup)

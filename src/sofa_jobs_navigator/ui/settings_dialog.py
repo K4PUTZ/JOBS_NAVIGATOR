@@ -112,15 +112,6 @@ class SettingsDialog(tk.Toplevel):
         _cb_open_root = ttk.Checkbutton(open_row, variable=self._open_root_var)
         _cb_open_root.pack(side='left', padx=(0, 6))
         ttk.Label(open_row, text='Open root folder on SKU found.').pack(side='left')
-        # 7) Reset warnings (another line down)
-        reset_row = ttk.Frame(header)
-        reset_row.pack(anchor='w', pady=(2, 6))
-        ttk.Button(reset_row, text='Reset warnings', command=self._on_reset_warnings).pack(side='left')
-
-        # Tip row (no reset button)
-        tip_row = ttk.Frame(header)
-        tip_row.pack(anchor='w', pady=(4, 0))
-        ttk.Label(tip_row, text='Tip: Use Help in the toolbar or Home key to open Welcome.', foreground='#6c757d').pack(side='left')
 
         # Separator before favorites
         ttk.Separator(frame, orient='horizontal').grid(row=1, column=0, columnspan=3, sticky='ew', pady=(8, 6))
@@ -287,7 +278,6 @@ class SettingsDialog(tk.Toplevel):
             recent_skus=self._settings.recent_skus,
             default_suffix=getattr(self._settings, 'default_suffix', ' - FTR '),
             show_help_on_startup=getattr(self._settings, 'show_help_on_startup', True),
-            suppress_connect_setup_prompt=False if getattr(self, '_reset_warnings_flag', False) else getattr(self._settings, 'suppress_connect_setup_prompt', False),
         )
         self._on_save(updated)
         self.destroy()
@@ -301,14 +291,7 @@ class SettingsDialog(tk.Toplevel):
         except Exception:
             pass
 
-    def _on_reset_warnings(self) -> None:
-        """Mark that warnings should be reset on save; provide immediate feedback."""
-        # We don't mutate settings yet; we mark a local flag to clear on Save.
-        self._reset_warnings_flag = True
-        try:
-            messagebox.showinfo(title='Warnings reset', message='Hidden warnings will be restored on Save.', parent=self)
-        except Exception:
-            pass
+
 
     def _format_account(self, account: str | None) -> str:
         return f'Account: {account or "(unauthenticated)"}'

@@ -385,6 +385,18 @@ class WelcomeWindow(tk.Toplevel):
                 sounds_cb_frame.pack()
                 ttk.Checkbutton(sounds_cb_frame, variable=self._sounds_var).pack(side='left', padx=(0, 6))
                 ttk.Label(sounds_cb_frame, text='Sounds On').pack(side='left')
+                
+                # Add Home key instruction
+                for _ in range(2):
+                    ttk.Frame(self._extra_frame, height=8).pack(fill='x')
+                
+                home_key_frame = ttk.Frame(self._extra_frame)
+                home_key_frame.pack()
+                ttk.Label(
+                    home_key_frame, 
+                    text='💡 Tip: Press Home key anytime to reopen this Welcome Window',
+                    font=('TkDefaultFont', 10, 'italic')
+                ).pack()
         except Exception:
             pass
         for _ in range(2):
