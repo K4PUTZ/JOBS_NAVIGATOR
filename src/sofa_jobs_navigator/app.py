@@ -106,6 +106,11 @@ def run() -> None:
     def handle_launch(event: tk.Event | None = None) -> None:
         nonlocal last_sku
         text = clipboard.read_text()
+        # Detect all SKUs in clipboard for potential multi-SKU handling later
+        try:
+            all_results = DEFAULT_DETECTOR.find_all(text or '')
+        except Exception:
+            all_results = []
         if not FLAGS.offline_mode:
             try:
                 creds = auth_service.ensure_authenticated()
@@ -130,6 +135,12 @@ def run() -> None:
             LOGGER.warn('SKU missing from clipboard')
             sound_player.play_warning()
             return
+        # Offer to load additional SKUs (excluding the first already processed) if multiple were present
+        try:
+            if all_results and len(all_results) > 1:
+                _offer_load_multi_skus(all_results, first_processed=sku)
+        except Exception:
+            pass
 
         sku = sku_result.sku
         try:
@@ -329,6 +340,12 @@ def run() -> None:
                     sound_player.play_success()
                 except Exception:
                     pass
+                # Offer to load multiple SKUs into recents (no auto-search here)
+                if len(results) > 1:
+                    try:
+                        _offer_load_multi_skus(results, first_processed=None)
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -636,6 +653,57 @@ def run() -> None:
             pass
         try:
             handle_launch(None)
+        except Exception:
+            pass
+        try:
+            if len(results) > 1:
+                _offer_load_multi_skus(results, first_processed=first)
+        except Exception:
+            pass
+
+    def _offer_load_multi_skus(results, first_processed: str | None) -> None:
+        """Ask user whether to load additional SKUs into Recents.
+
+        results: list of detector results (objects with .sku)
+        first_processed: SKU already processed (exclude from addition) or None
+        """
+        try:
+            if not results or len(results) <= 1:
+                return
+            try:
+                prompt_msg = 'Load additional found SKUs into Recents?'
+                ok = messagebox.askyesno(title='Load Recents', message=prompt_msg)
+            except Exception:
+                ok = False
+            if not ok:
+                return
+            found_skus = [r.sku for r in results]
+            seen = set()
+            unique: list[str] = []
+            for s in found_skus:
+                if s not in seen:
+                    seen.add(s)
+                    unique.append(s)
+            # Exclude first processed if provided
+            if first_processed:
+                unique_no_first = [s for s in unique if s != first_processed]
+            else:
+                unique_no_first = unique
+            to_add = unique_no_first[:7]
+            for sku in reversed(to_add):
+                try:
+                    recent_history.add(sku)
+                except Exception:
+                    pass
+            try:
+                settings_manager.save(settings)
+            except Exception:
+                pass
+            try:
+                main_window.update_recents(recent_history.items())
+                main_window.console_success('Loaded found SKUs into Recents.')
+            except Exception:
+                pass
         except Exception:
             pass
         if len(results) > 1:
