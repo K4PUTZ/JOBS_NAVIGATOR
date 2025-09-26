@@ -84,7 +84,21 @@ class SettingsDialog(tk.Toplevel):
         _cb_connect = ttk.Checkbutton(conn_row, variable=self._connect_start_var)
         _cb_connect.pack(side='left', padx=(0, 6))
         ttk.Label(conn_row, text='Connect on Startup.').pack(side='left')
-        # 3) Open root folder on SKU found (new option; disabled by default)
+        # 3) Prompt to connect on Startup when not connected
+        prompt_row = ttk.Frame(header)
+        prompt_row.pack(anchor='w', pady=(2, 2))
+        self._prompt_connect_var = tk.BooleanVar(value=bool(getattr(self._settings, 'prompt_for_connect_on_startup', True)))
+        _cb_prompt_connect = ttk.Checkbutton(prompt_row, variable=self._prompt_connect_var)
+        _cb_prompt_connect.pack(side='left', padx=(0, 6))
+        ttk.Label(prompt_row, text='Prompt to connect on Startup.').pack(side='left')
+        # 4) Auto-search clipboard after connecting on startup
+        auto_row = ttk.Frame(header)
+        auto_row.pack(anchor='w', pady=(2, 2))
+        self._auto_search_after_var = tk.BooleanVar(value=bool(getattr(self._settings, 'auto_search_clipboard_after_connect', False)))
+        _cb_auto_search = ttk.Checkbutton(auto_row, variable=self._auto_search_after_var)
+        _cb_auto_search.pack(side='left', padx=(0, 6))
+        ttk.Label(auto_row, text='Auto-search clipboard after connect.').pack(side='left')
+        # 5) Open root folder on SKU found (existing option)
         open_row = ttk.Frame(header)
         open_row.pack(anchor='w', pady=(2, 6))
         self._open_root_var = tk.BooleanVar(value=bool(getattr(self._settings, 'open_root_on_sku_found', False)))
@@ -259,6 +273,8 @@ class SettingsDialog(tk.Toplevel):
             save_recent_skus=self._settings.save_recent_skus,
             sounds_enabled=bool(self._sounds_var.get()) if hasattr(self, '_sounds_var') else self._settings.sounds_enabled,
             connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', False),
+            prompt_for_connect_on_startup=bool(self._prompt_connect_var.get()) if hasattr(self, '_prompt_connect_var') else getattr(self._settings, 'prompt_for_connect_on_startup', True),
+            auto_search_clipboard_after_connect=bool(self._auto_search_after_var.get()) if hasattr(self, '_auto_search_after_var') else getattr(self._settings, 'auto_search_clipboard_after_connect', False),
             open_root_on_sku_found=bool(self._open_root_var.get()) if hasattr(self, '_open_root_var') else getattr(self._settings, 'open_root_on_sku_found', False),
             recent_skus=self._settings.recent_skus,
             default_suffix=getattr(self._settings, 'default_suffix', ' - FTR '),

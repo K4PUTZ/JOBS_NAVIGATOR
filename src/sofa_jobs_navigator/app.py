@@ -529,6 +529,11 @@ def run() -> None:
             except Exception:
                 pass
             LOGGER.info('auth.auto_connected', account=email)
+            try:
+                if bool(getattr(settings, 'auto_search_clipboard_after_connect', False)):
+                    _post_connect_clipboard_scan()
+            except Exception:
+                pass
         except Exception:
             LOGGER.info('auth.auto_connect_failed')
 
@@ -552,13 +557,20 @@ def run() -> None:
                 return
         except Exception:
             pass
-        # No valid credentials; ask user
+        # No valid credentials; optionally ask user depending on setting
         try:
-            ok = messagebox.askyesno(
-                title='Connect to Google Drive?',
-                message='You are not connected to Google Drive yet. Connect now?'
-            )
+            prompt_enabled = bool(getattr(settings, 'prompt_for_connect_on_startup', True))
         except Exception:
+            prompt_enabled = True
+        if prompt_enabled:
+            try:
+                ok = messagebox.askyesno(
+                    title='Connect to Google Drive?',
+                    message='You are not connected to Google Drive yet. Connect now?'
+                )
+            except Exception:
+                ok = False
+        else:
             ok = False
         if ok:
             try:
@@ -573,6 +585,11 @@ def run() -> None:
                 except Exception:
                     pass
                 LOGGER.info('auth.connected.startup_prompt', account=email)
+                try:
+                    if bool(getattr(settings, 'auto_search_clipboard_after_connect', False)):
+                        _post_connect_clipboard_scan()
+                except Exception:
+                    pass
             except Exception as exc:
                 main_window.console_error(f'Auth failed: {exc}')
                 LOGGER.error('auth.failed.startup_prompt', error=str(exc))
@@ -585,6 +602,74 @@ def run() -> None:
         root.after(250, _startup_auth_flow)
     except Exception:
         pass
+
+    def _post_connect_clipboard_scan() -> None:
+        """If enabled, perform a clipboard SKU lookup and optionally launch search automatically.
+
+        This mirrors previous auto-connect behavior but gated behind a user setting.
+        """
+        try:
+            txt = clipboard.read_text()
+        except Exception:
+            txt = ''
+        try:
+            results = DEFAULT_DETECTOR.find_all(txt or '')
+        except Exception:
+            results = []
+        if not results:
+            try:
+                main_window.console_warning('No SKU found in clipboard after connect.')
+            except Exception:
+                pass
+            return
+        # If at least one, optionally auto-run search with first SKU
+        first = results[0].sku
+        try:
+            root.clipboard_clear()
+            root.clipboard_append(first)
+            root.update_idletasks()
+        except Exception:
+            pass
+        try:
+            main_window.set_current_sku(first)
+        except Exception:
+            pass
+        try:
+            handle_launch(None)
+        except Exception:
+            pass
+        if len(results) > 1:
+            # Offer to load additional SKUs into recents (reuse earlier logic but simplified)
+            try:
+                ok = messagebox.askyesno(
+                    title='Load Recents',
+                    message='Load additional found SKUs into Recents?'
+                )
+            except Exception:
+                ok = False
+            if ok:
+                found_skus = [r.sku for r in results]
+                seen = set()
+                unique: list[str] = []
+                for s in found_skus:
+                    if s not in seen:
+                        seen.add(s)
+                        unique.append(s)
+                to_add = unique[:7]
+                for sku in reversed(to_add):
+                    try:
+                        recent_history.add(sku)
+                    except Exception:
+                        pass
+                try:
+                    settings_manager.save(settings)
+                except Exception:
+                    pass
+                try:
+                    main_window.update_recents(recent_history.items())
+                    main_window.console_success('Loaded found SKUs into Recents.')
+                except Exception:
+                    pass
 
     # Additionally, bring up the setup dialog on startup when conditions are met:
     # - working folder is empty

@@ -32,6 +32,10 @@ class Settings:
     save_recent_skus: bool = True
     sounds_enabled: bool = True
     connect_on_startup: bool = False
+    # If True, show a connect prompt when no valid credentials exist at startup (unless offline)
+    prompt_for_connect_on_startup: bool = True
+    # If True, after a successful startup connect (auto or prompted) perform a clipboard SKU auto-search
+    auto_search_clipboard_after_connect: bool = False
     # When enabled, automatically open the SKU root in the browser when a SKU is found
     open_root_on_sku_found: bool = False
     recent_skus: List[str] = field(default_factory=list)
@@ -64,6 +68,8 @@ class SettingsManager:
             save_recent_skus=raw.get('save_recent_skus', True),
             sounds_enabled=raw.get('sounds_enabled', True),
             connect_on_startup=raw.get('connect_on_startup', False),
+            prompt_for_connect_on_startup=raw.get('prompt_for_connect_on_startup', True),
+            auto_search_clipboard_after_connect=raw.get('auto_search_clipboard_after_connect', False),
             open_root_on_sku_found=raw.get('open_root_on_sku_found', False),
             recent_skus=raw.get('recent_skus', []),
             show_help_on_startup=raw.get('show_help_on_startup', True),
@@ -81,6 +87,8 @@ class SettingsManager:
             'save_recent_skus': settings.save_recent_skus,
             'sounds_enabled': settings.sounds_enabled,
             'connect_on_startup': settings.connect_on_startup,
+            'prompt_for_connect_on_startup': getattr(settings, 'prompt_for_connect_on_startup', True),
+            'auto_search_clipboard_after_connect': getattr(settings, 'auto_search_clipboard_after_connect', False),
             'open_root_on_sku_found': getattr(settings, 'open_root_on_sku_found', False),
             'recent_skus': settings.recent_skus,
             'show_help_on_startup': settings.show_help_on_startup,
