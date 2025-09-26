@@ -138,7 +138,7 @@ def run() -> None:
         # Offer to load additional SKUs (excluding the first already processed) if multiple were present
         try:
             if all_results and len(all_results) > 1:
-                _offer_load_multi_skus(all_results, first_processed=sku)
+                _offer_load_multi_skus(all_results, first_processed=sku_result.sku)
         except Exception:
             pass
 
@@ -722,38 +722,6 @@ def run() -> None:
                 pass
         except Exception:
             pass
-        if len(results) > 1:
-            # Offer to load additional SKUs into recents (reuse earlier logic but simplified)
-            try:
-                ok = messagebox.askyesno(
-                    title='Load Recents',
-                    message='Load additional found SKUs into Recents?'
-                )
-            except Exception:
-                ok = False
-            if ok:
-                found_skus = [r.sku for r in results]
-                seen = set()
-                unique: list[str] = []
-                for s in found_skus:
-                    if s not in seen:
-                        seen.add(s)
-                        unique.append(s)
-                to_add = unique[:7]
-                for sku in reversed(to_add):
-                    try:
-                        recent_history.add(sku)
-                    except Exception:
-                        pass
-                try:
-                    settings_manager.save(settings)
-                except Exception:
-                    pass
-                try:
-                    main_window.update_recents(recent_history.items())
-                    main_window.console_success('Loaded found SKUs into Recents.')
-                except Exception:
-                    pass
 
     # Additionally, bring up the setup dialog on startup when conditions are met:
     # - working folder is empty
