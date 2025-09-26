@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Welcome / Help window with interactive onboarding controls on select pages."""
 
+import sys
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
@@ -191,23 +192,43 @@ class WelcomeWindow(tk.Toplevel):
         self._update_page()
 
     def _go_next(self) -> None:
-        # Soft warnings
+        # Validation and warnings for specific pages
         try:
+            # Page 1 (index 0): Check connection status
             if self._current_page == 0 and callable(self._cb_is_connected):
                 if not bool(self._cb_is_connected()):
                     messagebox.showwarning(
-                        title='Not connected',
-                        message='You are not connected; remote folder search will be limited until you connect.\nPress F11 later to open Settings.',
+                        title='Not Connected',
+                        message='You are not connected to Google Drive. You won\'t be able to search for remote folders until you connect.\n\nYou can press F11 later to open Settings and connect.',
                         parent=self,
                     )
+            
+            # Page 6 (index 5): Validate working folder
             if self._current_page == 5 and self._settings is not None:
                 wf = (self._settings.working_folder or '').strip()
+                # Check if working folder is empty or invalid
                 if not wf:
                     messagebox.showwarning(
-                        title='Working Folder not set',
-                        message='Without a Working Folder you cannot create local SKU folders in one click.\nPress F11 later to open Settings.',
+                        title='Working Folder Not Set',
+                        message='Without a Working Folder you won\'t be able to create SKU folders in one click.\n\nYou can press F11 later to open Settings and configure it.',
                         parent=self,
                     )
+                else:
+                    # Check if the folder actually exists
+                    try:
+                        folder_path = Path(wf)
+                        if not folder_path.exists() or not folder_path.is_dir():
+                            messagebox.showwarning(
+                                title='Working Folder Invalid',
+                                message=f'The Working Folder path is not valid or does not exist:\n{wf}\n\nYou won\'t be able to create SKU folders in one click. You can press F11 later to open Settings and configure it.',
+                                parent=self,
+                            )
+                    except Exception:
+                        messagebox.showwarning(
+                            title='Working Folder Invalid',
+                            message=f'The Working Folder path is not valid:\n{wf}\n\nYou won\'t be able to create SKU folders in one click. You can press F11 later to open Settings and configure it.',
+                            parent=self,
+                        )
         except Exception:
             pass
         # Persist toggles on final page
@@ -245,6 +266,9 @@ class WelcomeWindow(tk.Toplevel):
         self._btn_next.configure(text='Finish' if self._current_page == self._page_count - 1 else 'Next')
         self._render_indicators()
         self._render_extra_controls()
+        # If we're on page 0 and the Connect button exists, update its appearance
+        if self._current_page == 0:
+            self.after(10, self._update_connect_button_appearance)  # Small delay to ensure button is created
         self.after(0, self._center_once)
 
     def _render_indicators(self) -> None:
@@ -276,7 +300,15 @@ class WelcomeWindow(tk.Toplevel):
             if p == 0:
                 row = ttk.Frame(self._extra_frame); row.pack(fill='x')
                 ttk.Label(row, text='To begin, we must connect to Google Drive.').pack(side='left')
-                ttk.Button(row, text='Connect', command=self._on_press_auth).pack(side='left', padx=(12, 0))
+                
+                # Create Connect button and store reference
+                is_connected = callable(self._cb_is_connected) and bool(self._cb_is_connected())
+                button_text = 'Connected' if is_connected else 'Connect'
+                self._connect_button = ttk.Button(row, text=button_text, command=self._on_press_auth)
+                self._connect_button.pack(side='left', padx=(12, 0))
+                
+                # Configure button appearance based on connection status
+                self._update_connect_button_appearance()
             elif p == 3:
                 row = ttk.Frame(self._extra_frame); row.pack(fill='x')
                 ttk.Label(row, text='You can set your favorite shortcuts in the settings now, or press F11 later.').pack(side='left')
@@ -284,11 +316,19 @@ class WelcomeWindow(tk.Toplevel):
             elif p == 5:
                 ttk.Label(self._extra_frame, text='Choose your Working Folder, where you keep your projects:').pack(anchor='w')
                 browse = ttk.Frame(self._extra_frame); browse.pack(fill='x', pady=(4, 0))
+                # Get current working folder from settings, display current path if already set
                 current = '' if not self._settings else (self._settings.working_folder or '')
-                self._wf_var = tk.StringVar(value=current)
+                if current:
+                    # Show current path with better formatting
+                    display_text = f'Current: {current}'
+                else:
+                    display_text = '(no folder selected)'
+                self._wf_var = tk.StringVar(value=display_text)
                 self._wf_entry = ttk.Entry(browse, textvariable=self._wf_var, width=54, state='readonly')
                 self._wf_entry.pack(side='left', padx=(0, 6))
                 ttk.Button(browse, text='Browse…', command=self._pick_working_folder).pack(side='left')
+                # Store the actual path separately for validation
+                self._actual_wf_path = current
             elif p == 6:
                 sounds = bool(getattr(self._settings, 'sounds_enabled', True)) if self._settings else True
                 connect = bool(getattr(self._settings, 'connect_on_startup', False)) if self._settings else False
@@ -312,6 +352,8 @@ class WelcomeWindow(tk.Toplevel):
         if callable(self._cb_auth_connect):
             try:
                 self._cb_auth_connect()
+                # Update button appearance after successful connection
+                self._update_connect_button_appearance()
             except Exception as exc:
                 try:
                     messagebox.showerror(title='Auth failed', message=str(exc), parent=self)
@@ -325,26 +367,184 @@ class WelcomeWindow(tk.Toplevel):
             except Exception:
                 pass
 
-    def _pick_working_folder(self) -> None:
-        current = getattr(self, '_wf_var', None).get() if hasattr(self, '_wf_var') else ''
+    def refresh_connection_status(self) -> None:
+        """Refresh the connection status and update UI accordingly.
+        
+        This method can be called from external sources when the connection
+        status changes to update the welcome window's UI.
+        """
+        if self._current_page == 0:  # Only update if we're on the connect page
+            self._update_connect_button_appearance()
+    
+    def _update_connect_button_appearance(self) -> None:
+        """Update Connect button appearance based on connection status."""
+        if not hasattr(self, '_connect_button'):
+            return
+        
         try:
-            chosen = filedialog.askdirectory(parent=self, initialdir=current or None, title='Select working folder')
-        except Exception:
-            chosen = ''
-        if chosen:
-            try:
-                self._wf_entry.configure(state='normal')
-                self._wf_var.set(chosen)
-                self._wf_entry.configure(state='readonly')
-            except Exception:
-                pass
-            if self._settings is not None:
+            is_connected = callable(self._cb_is_connected) and bool(self._cb_is_connected())
+            
+            if is_connected:
+                # Change to green "Connected" state
+                self._connect_button.configure(text='Connected')
+                
+                # For reliable green styling, always use tk.Button on macOS/darwin
+                # ttk styling is too limited on native macOS themes
+                styling_success = False
+                
+                # Check if we're on macOS or if we want to force tk.Button for green styling
+                use_tk_button = (sys.platform == 'darwin') or True  # Force tk.Button for reliable styling
+                
+                if not use_tk_button:
+                    # Approach 1: Try ttk styling first (for non-macOS platforms)
+                    try:
+                        style = ttk.Style()
+                        style_name = 'Connected.TButton'
+                        
+                        style.configure(
+                            style_name,
+                            background='#28a745',
+                            foreground='white',
+                            focuscolor='none',
+                            relief='raised',
+                            borderwidth=1
+                        )
+                        style.map(
+                            style_name,
+                            background=[('active', '#218838'), ('pressed', '#1e7e34')],
+                            foreground=[('active', 'white'), ('pressed', 'white')],
+                            relief=[('pressed', 'sunken')]
+                        )
+                        
+                        self._connect_button.configure(style=style_name)
+                        styling_success = True
+                        
+                    except Exception as e:
+                        print(f"TTK styling failed: {e}")
+                
+                # Approach 2: Use tk.Button for reliable cross-platform green styling
+                if not styling_success and hasattr(self, '_connect_button'):
+                    try:
+                        # Get the parent and position of the current button
+                        parent = self._connect_button.master
+                        pack_info = self._connect_button.pack_info()
+                        
+                        # Remove the old ttk button
+                        self._connect_button.destroy()
+                        
+                        # Create a new tk.Button with direct color control
+                        self._connect_button = tk.Button(
+                            parent,
+                            text='Connected',
+                            command=self._on_press_auth,
+                            bg='#2b2b2b',    # Dark gray background
+                            fg='#28a745',    # Green text
+                            activebackground='#3a3a3a',  # Slightly lighter gray when hovered
+                            activeforeground='#22c55e',  # Brighter green text when hovered
+                            relief='raised',
+                            borderwidth=1,
+                            font=('Segoe UI', 9) if sys.platform == 'win32' else None
+                        )
+                        
+                        # Restore the same packing
+                        self._connect_button.pack(**pack_info)
+                        
+                        styling_success = True
+                        
+                    except Exception as e:
+                        print(f"tk.Button replacement failed: {e}")
+                
+                if not styling_success:
+                    print("Warning: Could not apply green styling to Connect button")
+                    
+            else:
+                # Reset to default "Connect" state
+                # If we have a tk.Button (green state), replace with ttk.Button
+                if hasattr(self, '_connect_button') and isinstance(self._connect_button, tk.Button):
+                    try:
+                        # Get the parent and position
+                        parent = self._connect_button.master
+                        pack_info = self._connect_button.pack_info()
+                        
+                        # Remove the tk button
+                        self._connect_button.destroy()
+                        
+                        # Create new ttk button
+                        self._connect_button = ttk.Button(
+                            parent,
+                            text='Connect',
+                            command=self._on_press_auth
+                        )
+                        
+                        # Restore packing
+                        self._connect_button.pack(**pack_info)
+                        
+                    except Exception:
+                        pass
+                else:
+                    # Just update text and reset style
+                    self._connect_button.configure(text='Connect')
+                    try:
+                        self._connect_button.configure(style='TButton')
+                    except Exception:
+                        pass
+                
                 try:
-                    self._settings.working_folder = chosen
-                    if callable(self._cb_save_settings):
-                        self._cb_save_settings()
+                    self._connect_button.configure(state='normal')
                 except Exception:
                     pass
+                    
+        except Exception as e:
+            print(f"Connect button appearance update failed: {e}")
+            pass
+
+    def _pick_working_folder(self) -> None:
+        # Use the actual path stored separately, not the display text
+        current = getattr(self, '_actual_wf_path', '') or ''
+        try:
+            chosen = filedialog.askdirectory(
+                parent=self, 
+                initialdir=current or None, 
+                title='Select Working Folder'
+            )
+        except Exception:
+            chosen = ''
+        
+        if chosen:
+            try:
+                # Validate the chosen directory exists
+                chosen_path = Path(chosen)
+                if not chosen_path.exists() or not chosen_path.is_dir():
+                    messagebox.showerror(
+                        title='Invalid Folder',
+                        message=f'The selected path is not a valid directory:\n{chosen}',
+                        parent=self
+                    )
+                    return
+                
+                # Update the display and internal state
+                self._wf_entry.configure(state='normal')
+                self._wf_var.set(f'Current: {chosen}')
+                self._wf_entry.configure(state='readonly')
+                self._actual_wf_path = chosen
+                
+                # Save to settings if different from current setting
+                if self._settings is not None:
+                    old_path = (self._settings.working_folder or '').strip()
+                    if old_path != chosen:
+                        self._settings.working_folder = chosen
+                        if callable(self._cb_save_settings):
+                            self._cb_save_settings()
+                        # Log the change
+                        print(f'Working folder updated: {old_path} -> {chosen}')
+                        
+            except Exception as e:
+                messagebox.showerror(
+                    title='Error',
+                    message=f'Error setting working folder: {str(e)}',
+                    parent=self
+                )
+                print(f'Error in _pick_working_folder: {e}')
 
     # ---------- Utility ----------
     def _center_once(self) -> None:

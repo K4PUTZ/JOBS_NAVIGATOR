@@ -72,6 +72,45 @@ def run() -> None:
         nonlocal current_account
         current_account = account
 
+    def handle_auth_connect() -> None:
+        """Shared auth connection handler for both settings and welcome window."""
+        try:
+            creds = auth_service.ensure_authenticated()
+            email = auth_service.get_account_email(creds) or getattr(creds, 'service_account_email', None) or getattr(creds, 'client_id', None)
+            update_account_label(email)
+            # Enable online Drive service immediately
+            drive_client._service_factory = lambda: GoogleDriveService(creds)  # type: ignore[attr-defined]
+            main_window.console_success('Connected to Google Drive.')
+            try:
+                expiry = auth_service.get_token_expiry_iso(creds)
+                main_window.set_status(online=True, account=email, token_expiry_iso=expiry)
+            except Exception:
+                pass
+            LOGGER.info('auth.connected', account=email)
+        except Exception as exc:
+            main_window.console_error(f'Auth failed: {exc}')
+            LOGGER.error('auth.failed', error=str(exc))
+            raise  # Re-raise for welcome window error handling
+
+    def handle_auth_clear() -> None:
+        """Shared auth clear handler for settings dialog."""
+        auth_service.clear_tokens()
+        update_account_label(None)
+        main_window.console_success('Cleared stored credentials.')
+        try:
+            main_window.set_status(online=False, account=None)
+        except Exception:
+            pass
+        LOGGER.info('auth.cleared')
+
+    def is_connected() -> bool:
+        """Check if user is currently connected to Google Drive."""
+        return current_account is not None
+
+    def save_settings_callback() -> None:
+        """Save settings to disk."""
+        settings_manager.save(settings)
+
     def navigate_to_favorite(sku: str, favorite_path: str) -> None:
         if not sku or sku == '(unknown)':
             main_window.console_warning('No SKU context yet. Press F12 after copying a SKU.')
@@ -259,38 +298,19 @@ def run() -> None:
             LOGGER.info('Settings saved via dialog')
 
         def on_auth_connect() -> None:
+            """Settings dialog auth connect wrapper that updates dialog state."""
+            handle_auth_connect()
+            # Update account label in settings dialog immediately if open
             try:
-                creds = auth_service.ensure_authenticated()
-                email = auth_service.get_account_email(creds) or getattr(creds, 'service_account_email', None) or getattr(creds, 'client_id', None)
-                update_account_label(email)
-                # Enable online Drive service immediately
-                drive_client._service_factory = lambda: GoogleDriveService(creds)  # type: ignore[attr-defined]
-                main_window.console_success('Connected to Google Drive.')
-                try:
-                    expiry = auth_service.get_token_expiry_iso(creds)
-                    main_window.set_status(online=True, account=email, token_expiry_iso=expiry)
-                except Exception:
-                    pass
-                # Update account label in settings dialog immediately if open
-                try:
-                    dlg = dialog_ref.get("dlg")
-                    if dlg is not None:
-                        dlg.set_account(email)
-                except Exception:
-                    pass
-                LOGGER.info('auth.connected', account=email)
-            except Exception as exc:
-                main_window.console_error(f'Auth failed: {exc}')
-                LOGGER.error('auth.failed', error=str(exc))
-
-        def on_auth_clear() -> None:
-            auth_service.clear_tokens()
-            update_account_label(None)
-            main_window.console_success('Cleared stored credentials.')
-            try:
-                main_window.set_status(online=False, account=None)
+                dlg = dialog_ref.get("dlg")
+                if dlg is not None:
+                    dlg.set_account(current_account)
             except Exception:
                 pass
+
+        def on_auth_clear() -> None:
+            """Settings dialog auth clear wrapper that updates dialog state."""
+            handle_auth_clear()
             # Update account label in settings dialog immediately if open
             try:
                 dlg = dialog_ref.get("dlg")
@@ -298,7 +318,6 @@ def run() -> None:
                     dlg.set_account(None)
             except Exception:
                 pass
-            LOGGER.info('auth.cleared')
 
         dialog_ref["dlg"] = SettingsDialog(
             root,
@@ -364,7 +383,14 @@ def run() -> None:
 
     def on_help_action() -> None:
         try:
-            WelcomeWindow(root)
+            WelcomeWindow(
+                root,
+                settings=settings,
+                on_auth_connect=handle_auth_connect,
+                on_open_settings=on_open_settings,
+                is_connected=is_connected,
+                save_settings=save_settings_callback,
+            )
         except Exception:
             try:
                 main_window.append_console('Help is under development.')
@@ -435,7 +461,14 @@ def run() -> None:
             # Open Help when user accepts
             if result['ok']:
                 try:
-                    WelcomeWindow(root)
+                    WelcomeWindow(
+                        root,
+                        settings=settings,
+                        on_auth_connect=handle_auth_connect,
+                        on_open_settings=on_open_settings,
+                        is_connected=is_connected,
+                        save_settings=save_settings_callback,
+                    )
                 except Exception:
                     pass
         except Exception:
@@ -446,7 +479,14 @@ def run() -> None:
                     message='It looks like you are not connected to Google Drive, would you like to set up the program now?'
                 )
                 if ok:
-                    WelcomeWindow(root)
+                    WelcomeWindow(
+                        root,
+                        settings=settings,
+                        on_auth_connect=handle_auth_connect,
+                        on_open_settings=on_open_settings,
+                        is_connected=is_connected,
+                        save_settings=save_settings_callback,
+                    )
             except Exception:
                 pass
 
