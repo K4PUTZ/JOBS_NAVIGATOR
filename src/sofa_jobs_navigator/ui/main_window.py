@@ -101,8 +101,18 @@ class MainWindow(ttk.Frame):
         console_frame.grid(row=5, column=0, sticky='nsew', padx=(0, 12))
         console_frame.columnconfigure(0, weight=1)
         console_frame.rowconfigure(0, weight=1)
-        self.console_text = tk.Text(console_frame, height=12, wrap='word', state='disabled')
+        # Attach vertical scroll bar so long console sessions remain accessible
+        self._console_scroll_y = ttk.Scrollbar(console_frame, orient='vertical')
+        self._console_scroll_y.grid(row=0, column=1, sticky='ns')
+        self.console_text = tk.Text(
+            console_frame,
+            height=12,
+            wrap='word',
+            state='disabled',
+            yscrollcommand=self._console_scroll_y.set,
+        )
         self.console_text.grid(row=0, column=0, sticky='nsew')
+        self._console_scroll_y.configure(command=self.console_text.yview)
         # Default console colors: white text on dark background; caret visible
         try:
             self.console_text.configure(bg='#1e1e1e', fg='#ffffff', insertbackground='#ffffff')
@@ -112,9 +122,11 @@ class MainWindow(ttk.Frame):
         try:
             self._console_menu = tk.Menu(self, tearoff=0)
             self._console_menu.add_command(label='Copy', command=self._copy_console_selection)
+            self._console_menu.add_command(label='Clear Console', command=self._clear_console)
             # Right-click bindings (Windows/Linux) and Ctrl-click (macOS)
-            self.console_text.bind('<Button-3>', self._show_console_context_menu)
-            self.console_text.bind('<Control-Button-1>', self._show_console_context_menu)
+            self.console_text.bind('<Button-3>', self._show_console_context_menu, add=True)
+            self.console_text.bind('<Button-2>', self._show_console_context_menu, add=True)
+            self.console_text.bind('<Control-Button-1>', self._show_console_context_menu, add=True)
         except Exception:
             self._console_menu = None  # type: ignore[assignment]
         # Console color tags for categorized messages
@@ -817,6 +829,11 @@ class MainWindow(ttk.Frame):
                 self._console_menu.entryconfig(0, state=(tk.NORMAL if has_sel else tk.DISABLED))
             except Exception:
                 pass
+            try:
+                # Clear Console should always be enabled, but guard in case menu missing
+                self._console_menu.entryconfig(1, state=tk.NORMAL)
+            except Exception:
+                pass
             # Show the menu at cursor position
             self._console_menu.tk_popup(event.x_root, event.y_root)
         except Exception:
@@ -826,6 +843,7 @@ class MainWindow(ttk.Frame):
                 self._console_menu.grab_release()
             except Exception:
                 pass
+        return 'break'
 
     def _copy_console_selection(self) -> None:
         """Copy current selection from console to clipboard and show a small toast."""
@@ -859,6 +877,15 @@ class MainWindow(ttk.Frame):
         if len(s) <= max_len:
             return s
         return s[: max_len - 1] + '…'
+
+    def _clear_console(self) -> None:
+        """Remove all text from the console widget."""
+        try:
+            self.console_text.configure(state='normal')
+            self.console_text.delete('1.0', 'end')
+            self.console_text.configure(state='disabled')
+        except Exception:
+            pass
 
     def _show_toast(self, widget: tk.Widget, text: str, *, duration_ms: int = 900) -> None:
         try:

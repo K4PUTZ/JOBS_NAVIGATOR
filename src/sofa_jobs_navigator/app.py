@@ -652,21 +652,23 @@ def run() -> None:
                 unique_no_first = [s for s in unique if s != first_processed]
             else:
                 unique_no_first = unique
-            # Console listing before asking
+            # Console listing before asking – show each SKU on its own cyan-highlighted bullet
             try:
                 if first_processed:
                     if unique_no_first:
-                        main_window.append_console(
-                            'Additional SKUs detected: ' + ', '.join(unique_no_first)
-                        )
+                        main_window.append_console('Additional SKUs detected:')
+                        for sku_value in unique_no_first:
+                            line = f"• {sku_value}"
+                            main_window.append_console_highlight(line, highlight=sku_value, highlight_tag='sku')
                     else:
                         # Nothing new beyond the first one
                         main_window.append_console('No additional unique SKUs beyond the first detected.')
                 else:
-                    # We're not excluding a first processed SKU (e.g. clipboard scan path)
-                    main_window.append_console(
-                        'Multiple SKUs detected: ' + ', '.join(unique)
-                    )
+                    if unique:
+                        main_window.append_console('Multiple SKUs detected:')
+                        for sku_value in unique:
+                            line = f"• {sku_value}"
+                            main_window.append_console_highlight(line, highlight=sku_value, highlight_tag='sku')
             except Exception:
                 pass
             ok = True
@@ -736,4 +738,3 @@ def run() -> None:
 
 if __name__ == '__main__':
     run()
-
