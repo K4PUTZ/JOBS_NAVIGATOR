@@ -141,7 +141,7 @@ class SettingsDialog(tk.Toplevel):
 
         for idx, fav in enumerate(self._settings.favorites, start=1):
             r = idx  # data rows start at 1
-            ttk.Label(fav_frame, text=f'{idx}.').grid(row=r, column=0, sticky='e', padx=(0, 4), pady=2)
+            ttk.Label(fav_frame, text=f'(F{idx})').grid(row=r, column=0, sticky='e', padx=(0, 4), pady=2)
             ttk.Label(fav_frame, text='SKU/').grid(row=r, column=1, sticky='e', padx=(0, 4), pady=2)
             path_var = tk.StringVar(value=fav.path)
             label_var = tk.StringVar(value=fav.label)

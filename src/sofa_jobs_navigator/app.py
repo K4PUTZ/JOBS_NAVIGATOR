@@ -319,6 +319,8 @@ def run() -> None:
             except Exception:
                 pass
 
+        # Disable Home key while settings dialog is open
+        root.unbind_all('<Home>')
         dialog_ref["dlg"] = SettingsDialog(
             root,
             settings=settings,
@@ -327,9 +329,13 @@ def run() -> None:
             on_auth_clear=on_auth_clear,
             current_account=current_account,
         )
-        # Ensure we release the dialog reference when it is destroyed
+        # Restore Home key when dialog is closed
+        def _restore_home(_):
+            root.unbind_all('<Home>')
+            root.bind_all('<Home>', lambda e: on_help_action())  # Do not use add=True
+            dialog_ref["dlg"] = None
         try:
-            dialog_ref["dlg"].bind("<Destroy>", lambda e: dialog_ref.__setitem__("dlg", None))
+            dialog_ref["dlg"].bind("<Destroy>", _restore_home)
         except Exception:
             pass
 
@@ -374,7 +380,13 @@ def run() -> None:
 
     def on_about_action() -> None:
         try:
-            AboutWindow(root)
+            # Disable Home key while about dialog is open
+            root.unbind_all('<Home>')
+            about_win = AboutWindow(root)
+            def _restore_home(_):
+                root.unbind_all('<Home>')
+                root.bind_all('<Home>', lambda e: on_help_action())  # Do not use add=True
+            about_win.bind('<Destroy>', _restore_home)
         except Exception:
             # About dialog failed to open - fail silently
             pass

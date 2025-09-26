@@ -77,6 +77,8 @@ class MainWindow(ttk.Frame):
             except Exception:
                 pass
             style.configure('Sofa.SKU.TLabel', foreground='#ffc107')
+            # Custom style for enabled favorite buttons with cyan text
+            style.configure('Sofa.Favorite.TButton', foreground='#0dcaf0')
         except Exception:
             pass
 
@@ -257,6 +259,7 @@ class MainWindow(ttk.Frame):
         except Exception:
             pass
         self._favorite_buttons: list[ttk.Button] = []
+        self._favorite_tooltips: list[_Tooltip] = []
         self._render_favorites()
 
         # Recent SKUs header with Clear button
@@ -427,6 +430,7 @@ class MainWindow(ttk.Frame):
             except Exception:
                 pass
         self._favorite_buttons.clear()
+        self._favorite_tooltips.clear()
         # Ensure grid columns are configured (idempotent)
         try:
             self._favorites_frame.grid_columnconfigure(0, weight=0)
@@ -443,13 +447,31 @@ class MainWindow(ttk.Frame):
             label_text = favorite.label or '(empty)'
             btn = ttk.Button(self._favorites_frame, text=label_text, command=lambda f=favorite: self._on_launch_shortcut(f.path))
             btn.grid(row=r, column=1, sticky='ew', pady=(1, 1))
-            # Apply disabled state until a SKU is detected
+            
+            # Create tooltip for the button
+            tooltip_text = 'Search any SKU to enable the shortcuts.'
+            if favorite.label or favorite.path:
+                # This favorite is configured - tooltip depends on enabled state
+                if self._favorites_enabled:
+                    tooltip_text = f"Navigate to: {favorite.path or '(root)'}"
+                else:
+                    tooltip_text = 'Search any SKU to enable the shortcuts.'
+            tip = _Tooltip(btn, text=tooltip_text, bg='#333333', fg='#ffffff')
+            self._favorite_tooltips.append(tip)
+            
+            # Apply disabled state and style
             try:
                 # Disable if the favorite is not configured at all (no label and no path)
                 if not (favorite.label or favorite.path):
                     btn.configure(state=tk.DISABLED)
                 else:
-                    btn.configure(state=(tk.NORMAL if self._favorites_enabled else tk.DISABLED))
+                    is_enabled = self._favorites_enabled
+                    btn.configure(state=(tk.NORMAL if is_enabled else tk.DISABLED))
+                    # Apply cyan style for enabled favorites
+                    if is_enabled:
+                        btn.configure(style='Sofa.Favorite.TButton')
+                    else:
+                        btn.configure(style='TButton')  # Reset to default style
             except Exception:
                 pass
             self._favorite_buttons.append(btn)
@@ -466,9 +488,30 @@ class MainWindow(ttk.Frame):
             try:
                 fav = self._settings.favorites[idx] if idx < len(self._settings.favorites) else None
                 if fav and not (getattr(fav, 'label', None) or getattr(fav, 'path', None)):
-                    btn.configure(state=tk.DISABLED)
+                    # Favorite not configured - always disabled
+                    btn.configure(state=tk.DISABLED, style='TButton')
                 else:
-                    btn.configure(state=(tk.NORMAL if self._favorites_enabled else tk.DISABLED))
+                    # Favorite is configured - enable/disable based on SKU detection
+                    is_enabled = self._favorites_enabled
+                    btn.configure(state=(tk.NORMAL if is_enabled else tk.DISABLED))
+                    # Apply cyan style for enabled favorites
+                    if is_enabled:
+                        btn.configure(style='Sofa.Favorite.TButton')
+                    else:
+                        btn.configure(style='TButton')  # Reset to default style
+                
+                # Update tooltip text
+                if idx < len(getattr(self, '_favorite_tooltips', [])):
+                    tooltip = self._favorite_tooltips[idx]
+                    if fav and (getattr(fav, 'label', None) or getattr(fav, 'path', None)):
+                        # This favorite is configured - tooltip depends on enabled state
+                        if self._favorites_enabled:
+                            tooltip.set_text(f"Navigate to: {getattr(fav, 'path', None) or '(root)'}")
+                        else:
+                            tooltip.set_text('Search any SKU to enable the shortcuts.')
+                    else:
+                        # Favorite not configured - always show enable message
+                        tooltip.set_text('Search any SKU to enable the shortcuts.')
             except Exception:
                 pass
 

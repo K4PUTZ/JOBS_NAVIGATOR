@@ -22,16 +22,16 @@ def make_flags(*, dry_run: bool) -> FlagSet:
     )
 
 
-def test_defaults_loaded_when_missing(tmp_path: Path):
-    manager = SettingsManager(flags=make_flags(dry_run=False), config_dir=tmp_path)
+def test_defaults_loaded_when_missing(test_data_dir: Path):
+    manager = SettingsManager(flags=make_flags(dry_run=False), config_dir=test_data_dir)
     settings = manager.load()
     # At least 8 favorites should be present by default
     assert len(settings.favorites) >= 8
     assert settings.recent_skus == []
 
 
-def test_save_and_reload(tmp_path: Path):
-    manager = SettingsManager(flags=make_flags(dry_run=False), config_dir=tmp_path)
+def test_save_and_reload(test_data_dir: Path):
+    manager = SettingsManager(flags=make_flags(dry_run=False), config_dir=test_data_dir)
     custom = Settings(
         favorites=[Favorite(label="Test", path="A/B", hotkey="1")],
         working_folder="/tmp",
@@ -51,8 +51,8 @@ def test_save_and_reload(tmp_path: Path):
     assert len(reloaded.favorites) >= len(custom.favorites)
 
 
-def test_dry_run_skips_write(tmp_path: Path):
-    manager = SettingsManager(flags=make_flags(dry_run=True), config_dir=tmp_path)
+def test_dry_run_skips_write(test_data_dir: Path):
+    manager = SettingsManager(flags=make_flags(dry_run=True), config_dir=test_data_dir)
     original = manager.load()
     manager.save(Settings(favorites=[], working_folder="/tmp", recent_skus=["SKU"]))
-    assert not (tmp_path / 'config.json').exists()
+    assert not (test_data_dir / 'config.json').exists()
