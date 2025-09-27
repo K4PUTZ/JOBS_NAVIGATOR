@@ -35,6 +35,8 @@ class MainWindow(ttk.Frame):
         on_create_sku_folder: Callable[[str], None] | None = None,
         on_settings_change: Callable[[Settings], None] | None = None,
         on_clear_recents: Callable[[], None] | None = None,
+        on_auth_connect: Callable[[], None] | None = None,
+        on_auth_clear: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(master, padding=12)
         self._settings = settings
@@ -47,13 +49,22 @@ class MainWindow(ttk.Frame):
         self._on_help = on_help
         self._on_create_sku_folder = on_create_sku_folder
         self._on_clear_recents = on_clear_recents
+        # Optional auth menu handlers (provided by app)
+        self._on_auth_connect = on_auth_connect
+        self._on_auth_clear = on_auth_clear
+        self._menu_recents: tk.Menu | None = None
         # Favorites are disabled until a SKU is detected
-        self._favorites_enabled: bool = False
+        self._favorites_enabled = False
         self._build_ui()
         # Bind favorite hotkeys once (handlers read from current settings)
         self._bind_favorite_hotkeys()
         # Bind number keys to recents 1..7
         self._bind_recent_hotkeys()
+        # Build application menu and bind accelerators
+        try:
+            self._build_menu()
+        except Exception:
+            pass
 
     # =================== UI CONSTRUCTION ===================
     def _build_ui(self) -> None:
@@ -404,6 +415,73 @@ class MainWindow(ttk.Frame):
                 pass
         outer.bind('<Enter>', on_enter)
         outer.bind('<Leave>', on_leave)
+
+    # -------------------- Application Menu --------------------
+    def _build_menu(self) -> None:
+        """Create a standard menubar with application actions, favorites, recents, auth and help."""
+        top = self.winfo_toplevel()
+        try:
+            menubar = tk.Menu(top)
+            # File menu
+            file_menu = tk.Menu(menubar, tearoff=0)
+            file_menu.add_command(label='Exit', command=top.quit, accelerator='Ctrl+Q')
+            menubar.add_cascade(label='File', menu=file_menu)
+
+            # Actions menu
+            actions = tk.Menu(menubar, tearoff=0)
+            actions.add_command(label='Search SKU', command=self._on_tool_search, accelerator='F12')
+            actions.add_command(label='Check Clipboard', command=self._on_tool_check_clipboard, accelerator='F9')
+            actions.add_command(label='Create SKU Folder', command=self._on_click_create_sku_folder)
+            menubar.add_cascade(label='Actions', menu=actions)
+
+            # Favorites menu (mirror favorites with F1..F8)
+            fav_menu = tk.Menu(menubar, tearoff=0)
+            for idx, fav in enumerate(getattr(self._settings, 'favorites', [])[:8]):
+                display = fav.label or f'Favorite {idx+1}'
+                key = f'F{idx+1}'
+                def _make_cmd(p):
+                    return lambda p=p: self._on_launch_shortcut(p)
+                fav_menu.add_command(label=display, command=_make_cmd(fav.path), accelerator=key)
+            menubar.add_cascade(label='Favorites', menu=fav_menu)
+
+            # Recents menu (1..7)
+            rec_menu = tk.Menu(menubar, tearoff=0)
+            self._menu_recents = rec_menu
+            self._refresh_menu_recents()
+            menubar.add_cascade(label='Recents', menu=rec_menu)
+
+            # Auth menu
+            auth_menu = tk.Menu(menubar, tearoff=0)
+            auth_menu.add_command(label='Connect to Google Drive', command=(self._on_auth_connect if callable(getattr(self, '_on_auth_connect', None)) else (lambda: None)), accelerator='Ctrl+K')
+            auth_menu.add_command(label='Clear Credentials', command=(self._on_auth_clear if callable(getattr(self, '_on_auth_clear', None)) else (lambda: None)), accelerator='Ctrl+L')
+            menubar.add_cascade(label='Auth', menu=auth_menu)
+
+            # Help menu
+            help_menu = tk.Menu(menubar, tearoff=0)
+            help_menu.add_command(label='Welcome', command=self._on_tool_help, accelerator='Home')
+            help_menu.add_command(label='About', command=self._on_tool_about, accelerator='F10')
+            help_menu.add_command(label='Settings', command=self._on_tool_settings, accelerator='F11')
+            menubar.add_cascade(label='Help', menu=help_menu)
+
+            try:
+                top.config(menu=menubar)
+            except Exception:
+                pass
+
+            # Bind accelerators to the same callbacks for robustness
+            try:
+                top.bind_all('<F12>', lambda e: self._on_tool_search(), add=True)
+                top.bind_all('<F9>', lambda e: self._on_tool_check_clipboard(), add=True)
+                top.bind_all('<F10>', lambda e: self._on_tool_about(), add=True)
+                top.bind_all('<F11>', lambda e: self._on_tool_settings(), add=True)
+                top.bind_all('<Home>', lambda e: self._on_tool_help(), add=True)
+                top.bind_all('<Control-q>', lambda e: top.quit(), add=True)
+                top.bind_all('<Control-k>', lambda e: (self._on_auth_connect() if callable(getattr(self, '_on_auth_connect', None)) else None), add=True)
+                top.bind_all('<Control-l>', lambda e: (self._on_auth_clear() if callable(getattr(self, '_on_auth_clear', None)) else None), add=True)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     # -------------------- Toolbar Actions --------------------
     def _on_tool_search(self) -> None:
@@ -798,7 +876,29 @@ class MainWindow(ttk.Frame):
                 except Exception:
                     pass
 
+        self._refresh_menu_recents()
+
     # =================== RECENTS INTERACTIONS ===================
+    def _refresh_menu_recents(self) -> None:
+        menu = getattr(self, '_menu_recents', None)
+        if menu is None:
+            return
+        try:
+            menu.delete(0, 'end')
+        except Exception:
+            return
+        values = getattr(self, '_recent_full_values', [])
+        if not values:
+            menu.add_command(label='(no recent SKUs)', state=tk.DISABLED)
+            return
+        for idx, value in enumerate(values, start=1):
+            if value:
+                label = f"{idx}. {value}"
+                cmd = lambda i=idx - 1: self._on_recent_click(i)
+                menu.add_command(label=label, command=cmd, accelerator=str(idx) if idx <= 9 else '')
+            else:
+                menu.add_command(label=f"{idx}. (empty)", state=tk.DISABLED)
+
     def _on_recent_click(self, index: int) -> None:
         try:
             full = self._recent_full_values[index]

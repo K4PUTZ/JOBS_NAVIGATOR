@@ -431,6 +431,8 @@ def run() -> None:
         on_create_sku_folder=on_create_sku_folder,
         on_settings_change=lambda s: settings_manager.save(s),
         on_clear_recents=clear_recent_skus,
+        on_auth_connect=handle_auth_connect,
+        on_auth_clear=handle_auth_clear,
     )
     # Ensure window is large enough to accommodate all UI elements
     try:
