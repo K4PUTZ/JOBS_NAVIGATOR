@@ -26,10 +26,12 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-# Import and run the app
-from sofa_jobs_navigator.app import run as app_run  # type: ignore  # noqa: E402
+# Import only the lightweight version helper early so `--version` works
 from sofa_jobs_navigator.version import app_display_title  # noqa: E402
+
 import tkinter as tk  # noqa: E402
+
+# Defer importing the app module until after we install the tkinter monkey-patch
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Sofa Jobs Navigator")
@@ -68,6 +70,9 @@ if __name__ == "__main__":
 
     tk.Tk = _tk_factory  # type: ignore[assignment]
     try:
+        # Import the app entrypoint after monkey-patching Tk so any Tk() created
+        # during module import will go through our factory (ensures auto-quit works).
+        from sofa_jobs_navigator.app import run as app_run  # type: ignore
         app_run()
     finally:
         tk.Tk = _orig_tk  # restore

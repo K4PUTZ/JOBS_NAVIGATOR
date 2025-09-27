@@ -149,9 +149,9 @@ class WelcomeWindow(tk.Toplevel):
                 "Generate a consistently named local folder in one step. Clean, predictable naming helps keep local workspaces tidy."
             ),
             (
-                "Configure your preferences\n\n"
-                "Choose your preferred settings below. These match the options in Settings (F11) and can be changed later. "
-                "Press Finish to save your choices and begin working."
+                "Good to go!\n\n"
+                "If you wish to change your preferences later, just press F11.\n"
+                "Click Finish to save your choices and begin working."
             ),
         ]
         for idx, text in enumerate(texts, start=1):

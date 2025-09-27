@@ -625,6 +625,47 @@ def run() -> None:
             ok = False
         if ok:
             try:
+                # Close any transient/top-level dialogs (Welcome / Settings) so the
+                # browser-based auth flow's local server can open a browser tab
+                # without being obscured by modal windows.
+                try:
+                    # Release any grab (modal dialogues may have a grab) so destroy can proceed
+                    try:
+                        root.grab_release()
+                    except Exception:
+                        pass
+
+                    # Withdraw then destroy Toplevels to remove them from the window manager
+                    for w in list(root.winfo_children()):
+                        try:
+                            if isinstance(w, tk.Toplevel):
+                                try:
+                                    w.withdraw()
+                                except Exception:
+                                    pass
+                                try:
+                                    w.update_idletasks()
+                                except Exception:
+                                    pass
+                                try:
+                                    w.destroy()
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                # Ensure window manager processes the changes and give a slightly
+                # longer pause so the browser tab won't be obscured.
+                try:
+                    root.update()
+                    import time
+
+                    time.sleep(0.2)
+                    root.update()
+                except Exception:
+                    pass
+
                 creds = auth_service.ensure_authenticated()
                 email = auth_service.get_account_email(creds) or getattr(creds, 'service_account_email', None) or getattr(creds, 'client_id', None)
                 update_account_label(email)
