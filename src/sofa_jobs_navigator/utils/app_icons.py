@@ -77,7 +77,8 @@ def _iter_candidate_paths() -> tuple[str | None, str | None]:
         pass
 
     mod_dir = Path(__file__).resolve().parent
-    dirs.extend([mod_dir, mod_dir.parent, mod_dir.parent / "ui" / "assets" / "help"])  # package + help assets
+    # Prefer package/module directories and project roots first; help assets scanned later as last resort
+    dirs.extend([mod_dir, mod_dir.parent])
 
     # Also probe parents up to 5 levels (covers src/, project root, etc.)
     for i, parent in enumerate(mod_dir.parents):
@@ -90,13 +91,13 @@ def _iter_candidate_paths() -> tuple[str | None, str | None]:
 
     # 3) Define preferred filenames (case-insensitive match)
     name_order = [
-        # preferred PNGs
+        # Preferred iconset (use these whenever available)
         "sofa_icon.png",
         "sofa_icon_128.png",
+        "sofa_icon.ico",
+        # Absolute last resorts: generic sofa image from help assets
         "sofa.png",
         "Sofa.png",
-        # ICO fallbacks
-        "sofa_icon.ico",
     ]
 
     def find_in_dir(d: Path) -> None:
@@ -123,25 +124,31 @@ def _iter_candidate_paths() -> tuple[str | None, str | None]:
         if png_path and ico_path:
             break
 
+    # If nothing found yet, scan help assets directory only now (very last resort)
+    if not png_path and not ico_path:
+        help_dir = mod_dir.parent / "ui" / "assets" / "help"
+        find_in_dir(help_dir)
+
     # 4) As a last resort, try resource_path for classic relative candidates
     try:
         icon_candidates = [
-            # Prefer PNGs
+            # Preferred iconset in common locations
             "sofa_icon.png",
             os.path.join("JOBS NAVIGATOR", "sofa_icon.png"),
             os.path.join("JOBS_NAVIGATOR", "sofa_icon.png"),
             os.path.join("DRIVE_OPERATOR", "sofa_icon.png"),
-            # Fallback smaller PNG if the main one is missing
             "sofa_icon_128.png",
             os.path.join("JOBS NAVIGATOR", "sofa_icon_128.png"),
             os.path.join("JOBS_NAVIGATOR", "sofa_icon_128.png"),
             os.path.join("DRIVE_OPERATOR", "sofa_icon_128.png"),
-            # ICO fallbacks (mostly for Windows)
             "sofa_icon.ico",
             os.path.join("JOBS NAVIGATOR", "sofa_icon.ico"),
             os.path.join("JOBS_NAVIGATOR", "sofa_icon.ico"),
             os.path.join("DRIVE_OPERATOR", "sofa_icon.ico"),
             os.path.join("NAVIGATOR", "sofa_icon.ico"),
+            # Very last resort: help assets sofa image
+            os.path.join("sofa_jobs_navigator", "ui", "assets", "help", "Sofa.png"),
+            os.path.join("JOBS NAVIGATOR", "src", "sofa_jobs_navigator", "ui", "assets", "help", "Sofa.png"),
         ]
         for cand in icon_candidates:
             p = resource_path(cand)
