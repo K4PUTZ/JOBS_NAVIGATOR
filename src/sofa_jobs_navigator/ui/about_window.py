@@ -91,21 +91,24 @@ class AboutWindow(tk.Toplevel):
         self._about_sofa_image_ref = None
         try:
             base = Path(__file__).resolve().parent / 'assets' / 'help'
-            img_path = base / 'sofa.png'
-            if img_path.exists():
-                try:
-                    from PIL import Image, ImageTk  # type: ignore
-                    im = Image.open(str(img_path))
-                    self._about_sofa_image_ref = ImageTk.PhotoImage(im)
-                except Exception:
+            # Be case-insensitive across platforms (Linux is case-sensitive)
+            for name in ('sofa.png', 'Sofa.png'):
+                img_path = base / name
+                if img_path.exists():
                     try:
-                        self._about_sofa_image_ref = tk.PhotoImage(file=str(img_path))
+                        from PIL import Image, ImageTk  # type: ignore
+                        im = Image.open(str(img_path))
+                        self._about_sofa_image_ref = ImageTk.PhotoImage(im)
                     except Exception:
-                        self._about_sofa_image_ref = None
-                if self._about_sofa_image_ref is not None:
-                    img_row = ttk.Frame(self)
-                    img_row.pack(fill='x')
-                    tk.Label(img_row, image=self._about_sofa_image_ref, bd=0).pack(side='right')
+                        try:
+                            self._about_sofa_image_ref = tk.PhotoImage(file=str(img_path))
+                        except Exception:
+                            self._about_sofa_image_ref = None
+                    if self._about_sofa_image_ref is not None:
+                        img_row = ttk.Frame(self)
+                        img_row.pack(fill='x')
+                        tk.Label(img_row, image=self._about_sofa_image_ref, bd=0).pack(side='right')
+                    break
         except Exception:
             self._about_sofa_image_ref = None
 

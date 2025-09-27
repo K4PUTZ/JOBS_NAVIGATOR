@@ -13,7 +13,7 @@ from .config.flags import FLAGS
 from .version import app_display_title
 from .config.settings import Settings, SettingsManager
 from .controls.hotkeys import HotkeyManager
-from .logging.event_log import LOGGER
+from .logging.event_log import LOGGER, LOG_APP_NAME, LOG_FILE_NAME
 from .logging.console_file import CONSOLE_FILE_LOGGER
 from .services.auth_service import AuthService
 from .services.drive_client import DriveClient
@@ -27,6 +27,7 @@ from .utils.app_icons import set_app_icon
 from .utils.clipboard import ClipboardReader
 from .utils.sku import DEFAULT_DETECTOR
 from .utils.sound import SoundPlayer
+from platformdirs import user_log_path
 
 
 # =================== APPLICATION BOOT ===================
@@ -125,22 +126,25 @@ def run() -> None:
             result = drive_client.resolve_relative_path(sku, favorite_path)
             LOGGER.info('Resolved path', sku=sku, path=favorite_path, folder_id=result.folder_id)
             main_window.console_neutral(f"Resolved path '{favorite_path or '(root)'}' -> {result.folder_id}")
-            # Build Google Drive URL and open in the default browser
-            url = f"https://drive.google.com/drive/folders/{result.folder_id}"
-            main_window.console_success(f"Opening in browser: {url}")
-            try:
-                opened = webbrowser.open(url, new=2)
-                if not opened:
-                    # Fallback to OS-specific opener
-                    if sys.platform == 'darwin':
-                        subprocess.run(['open', url], check=False)
-                    elif os.name == 'nt':
-                        subprocess.run(['start', url], shell=True, check=False)
-                    else:
-                        subprocess.run(['xdg-open', url], check=False)
-            except Exception:
-                # Non-fatal; user can still use the URL from the console
-                pass
+            # Build Google Drive URL and open in the default browser (skip when offline)
+            if FLAGS.offline_mode or str(result.folder_id).startswith('offline:'):
+                main_window.console_neutral('Offline mode: not opening browser.')
+            else:
+                url = f"https://drive.google.com/drive/folders/{result.folder_id}"
+                main_window.console_success(f"Opening in browser: {url}")
+                try:
+                    opened = webbrowser.open(url, new=2)
+                    if not opened:
+                        # Fallback to OS-specific opener
+                        if sys.platform == 'darwin':
+                            subprocess.run(['open', url], check=False)
+                        elif os.name == 'nt':
+                            subprocess.run(['cmd', '/c', 'start', '', url], shell=False, check=False)
+                        else:
+                            subprocess.run(['xdg-open', url], check=False)
+                except Exception:
+                    # Non-fatal; user can still use the URL from the console
+                    pass
             sound_player.play_success()
         except LookupError as exc:
             main_window.console_error(str(exc))
@@ -211,19 +215,22 @@ def run() -> None:
                 # Resolve root path and open in browser (same as navigate_to_favorite with empty path)
                 try:
                     result = drive_client.resolve_relative_path(sku, '')
-                    url = f"https://drive.google.com/drive/folders/{result.folder_id}"
-                    main_window.console_neutral(f"Opening SKU root in browser: {url}")
-                    try:
-                        opened = webbrowser.open(url, new=2)
-                        if not opened:
-                            if sys.platform == 'darwin':
-                                subprocess.run(['open', url], check=False)
-                            elif os.name == 'nt':
-                                subprocess.run(['start', url], shell=True, check=False)
-                            else:
-                                subprocess.run(['xdg-open', url], check=False)
-                    except Exception:
-                        pass
+                    if FLAGS.offline_mode or str(result.folder_id).startswith('offline:'):
+                        main_window.console_neutral('Offline mode: root resolved (simulated); not opening browser.')
+                    else:
+                        url = f"https://drive.google.com/drive/folders/{result.folder_id}"
+                        main_window.console_neutral(f"Opening SKU root in browser: {url}")
+                        try:
+                            opened = webbrowser.open(url, new=2)
+                            if not opened:
+                                if sys.platform == 'darwin':
+                                    subprocess.run(['open', url], check=False)
+                                elif os.name == 'nt':
+                                    subprocess.run(['cmd', '/c', 'start', '', url], shell=False, check=False)
+                                else:
+                                    subprocess.run(['xdg-open', url], check=False)
+                        except Exception:
+                            pass
                 except Exception:
                     pass
         except Exception:
@@ -419,6 +426,60 @@ def run() -> None:
         settings_manager.save(settings)
         main_window.update_recents([])
 
+    def handle_reset_all() -> None:
+        """Reset preferences to defaults, clear logs, and clear auth tokens (with confirmation)."""
+        try:
+            ok = messagebox.askyesno(
+                title='Reset to Defaults',
+                message='This will reset preferences, clear logs, and sign out (clear tokens). Continue?'
+            )
+        except Exception:
+            ok = True
+        if not ok:
+            return
+        nonlocal settings, recent_history
+        # Reset preferences
+        try:
+            # Generate defaults via manager internals to stay consistent with app defaults
+            defaults = settings_manager._defaults()  # type: ignore[attr-defined]
+            settings = defaults
+            recent_history = RecentSKUHistory(settings)
+            settings_manager.save(settings)
+            try:
+                main_window.refresh_favorites(settings)
+                main_window.update_recents([])
+                main_window.set_favorites_enabled(False)
+                main_window.set_working_folder(settings.working_folder)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        # Clear console log
+        try:
+            from .logging.console_file import CONSOLE_FILE_LOGGER
+            CONSOLE_FILE_LOGGER.path.write_text('', encoding='utf-8')
+        except Exception:
+            pass
+        # Clear event log
+        try:
+            log_dir = user_log_path(LOG_APP_NAME)
+            (log_dir / LOG_FILE_NAME).write_text('', encoding='utf-8')
+        except Exception:
+            pass
+        # Clear auth tokens and set offline status
+        try:
+            auth_service.clear_tokens()
+            update_account_label(None)
+            main_window.set_status(online=False, account=None)
+        except Exception:
+            pass
+        # Notify user
+        try:
+            main_window.console_success('All preferences and logs have been reset; credentials cleared.')
+            messagebox.showinfo(title='Reset Complete', message='Preferences and logs were reset; you have been signed out.')
+        except Exception:
+            pass
+
     main_window = MainWindow(
         root,
         settings=settings,
@@ -433,6 +494,7 @@ def run() -> None:
         on_clear_recents=clear_recent_skus,
         on_auth_connect=handle_auth_connect,
         on_auth_clear=handle_auth_clear,
+        on_reset_all=handle_reset_all,
     )
     # Ensure window is large enough to accommodate all UI elements
     try:

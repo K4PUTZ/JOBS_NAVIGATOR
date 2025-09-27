@@ -37,6 +37,7 @@ class MainWindow(ttk.Frame):
         on_clear_recents: Callable[[], None] | None = None,
         on_auth_connect: Callable[[], None] | None = None,
         on_auth_clear: Callable[[], None] | None = None,
+        on_reset_all: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(master, padding=12)
         self._settings = settings
@@ -52,9 +53,10 @@ class MainWindow(ttk.Frame):
         # Optional auth menu handlers (provided by app)
         self._on_auth_connect = on_auth_connect
         self._on_auth_clear = on_auth_clear
+        self._on_reset_all = on_reset_all
         self._menu_recents: tk.Menu | None = None
         # Favorites are disabled until a SKU is detected
-        self._favorites_enabled = False
+        self._favorites_enabled = False  # Favorites and menu start disabled
         self._build_ui()
         # Bind favorite hotkeys once (handlers read from current settings)
         self._bind_favorite_hotkeys()
@@ -418,6 +420,7 @@ class MainWindow(ttk.Frame):
 
     # -------------------- Application Menu --------------------
     def _build_menu(self) -> None:
+        import tkinter.messagebox as messagebox
         """Create a standard menubar with application actions, favorites, recents, auth and help."""
         top = self.winfo_toplevel()
         try:
@@ -425,6 +428,15 @@ class MainWindow(ttk.Frame):
             # File menu
             file_menu = tk.Menu(menubar, tearoff=0)
             file_menu.add_command(label='Exit', command=top.quit, accelerator='Ctrl+Q')
+            try:
+                file_menu.add_separator()
+                file_menu.add_command(
+                    label='Reset to Defaults…',
+                    command=(self._on_reset_all if callable(getattr(self, '_on_reset_all', None)) else (lambda: None)),
+                    accelerator='Ctrl+Shift+R'
+                )
+            except Exception:
+                pass
             menubar.add_cascade(label='File', menu=file_menu)
 
             # Actions menu
@@ -436,19 +448,15 @@ class MainWindow(ttk.Frame):
 
             # Favorites menu (mirror favorites with F1..F8)
             fav_menu = tk.Menu(menubar, tearoff=0)
-            for idx, fav in enumerate(getattr(self._settings, 'favorites', [])[:8]):
-                display = fav.label or f'Favorite {idx+1}'
-                key = f'F{idx+1}'
-                def _make_cmd(p):
-                    return lambda p=p: self._on_launch_shortcut(p)
-                fav_menu.add_command(label=display, command=_make_cmd(fav.path), accelerator=key)
+            self._menu_favorites = fav_menu
             menubar.add_cascade(label='Favorites', menu=fav_menu)
+            self._refresh_menu_favorites()
 
             # Recents menu (1..7)
             rec_menu = tk.Menu(menubar, tearoff=0)
             self._menu_recents = rec_menu
-            self._refresh_menu_recents()
             menubar.add_cascade(label='Recents', menu=rec_menu)
+            self._refresh_menu_recents()
 
             # Auth menu
             auth_menu = tk.Menu(menubar, tearoff=0)
@@ -478,10 +486,31 @@ class MainWindow(ttk.Frame):
                 top.bind_all('<Control-q>', lambda e: top.quit(), add=True)
                 top.bind_all('<Control-k>', lambda e: (self._on_auth_connect() if callable(getattr(self, '_on_auth_connect', None)) else None), add=True)
                 top.bind_all('<Control-l>', lambda e: (self._on_auth_clear() if callable(getattr(self, '_on_auth_clear', None)) else None), add=True)
+                top.bind_all('<Control-Shift-R>', lambda e: (self._on_reset_all() if callable(getattr(self, '_on_reset_all', None)) else None), add=True)
             except Exception:
                 pass
         except Exception:
             pass
+
+    def _refresh_menu_favorites(self) -> None:
+        menu = getattr(self, '_menu_favorites', None)
+        if menu is None:
+            return
+        try:
+            menu.delete(0, 'end')
+        except Exception:
+            return
+        favorites = getattr(self._settings, 'favorites', [])[:8]
+        enabled = getattr(self, '_favorites_enabled', False)
+        for idx, fav in enumerate(favorites):
+            display = fav.label or f'Favorite {idx+1}'
+            key = f'F{idx+1}'
+            def _make_cmd(p):
+                return lambda p=p: self._on_launch_shortcut(p)
+            if fav.label or fav.path:
+                menu.add_command(label=display, command=_make_cmd(fav.path), accelerator=key, state=(tk.NORMAL if enabled else tk.DISABLED))
+            else:
+                menu.add_command(label=display, state=tk.DISABLED)
 
     # -------------------- Toolbar Actions --------------------
     def _on_tool_search(self) -> None:
@@ -622,6 +651,9 @@ class MainWindow(ttk.Frame):
             except Exception:
                 pass
 
+        # Also refresh the Favorites menu state
+        self._refresh_menu_favorites()
+
     def set_current_sku(self, sku: str | None) -> None:
         """Update the current SKU display in the status bar."""
         value = (sku or '').strip() or '(none)'
@@ -654,6 +686,8 @@ class MainWindow(ttk.Frame):
             self._current_sku_value = None if value == '(none)' else value
         except Exception:
             self._current_sku_value = None
+        # Enable favorites only if a valid SKU is set
+        self.set_favorites_enabled(self._current_sku_value is not None)
         self._refresh_working_folder_addon()
         self._refresh_create_button_state()
 
@@ -789,10 +823,17 @@ class MainWindow(ttk.Frame):
             pass
 
     def append_console_highlight(self, message: str, *, highlight: str, highlight_tag: str = 'sku', line_tag: str | None = None) -> None:
-        """Append a line and highlight SKU values in cyan."""
+        """Append a line and highlight SKU values in cyan. 'Copied SKU:' prefix is white."""
         self.console_text.configure(state='normal')
         line_start = self.console_text.index('end-1c')
-        self.console_text.insert('end', message + '\n')
+        # Special handling for 'Copied SKU:'
+        if message.startswith('Copied SKU:'):
+            prefix = 'Copied SKU:'
+            rest = message[len(prefix):]
+            self.console_text.insert('end', prefix, 'neutral')
+            self.console_text.insert('end', rest + '\n')
+        else:
+            self.console_text.insert('end', message + '\n')
         line_end = self.console_text.index('end-1c')
         try:
             if line_tag:
@@ -878,6 +919,19 @@ class MainWindow(ttk.Frame):
 
         self._refresh_menu_recents()
 
+    def show_error_dialog(self, title: str, message: str) -> None:
+        try:
+            import tkinter.messagebox as messagebox
+            messagebox.showerror(title, message)
+        except Exception:
+            # Fallback: print to console and log
+            self.console_error(f"{title}: {message}")
+            try:
+                import logging
+                logging.error(f"{title}: {message}")
+            except Exception:
+                pass
+
     # =================== RECENTS INTERACTIONS ===================
     def _refresh_menu_recents(self) -> None:
         menu = getattr(self, '_menu_recents', None)
@@ -928,95 +982,22 @@ class MainWindow(ttk.Frame):
                 self.append_console(f'Failed to clear recent SKUs: {e}')
 
     def _copy_to_clipboard(self, text: str) -> None:
+        """Copy text to clipboard, robust across OSes. Show error dialog if all methods fail."""
         try:
             self.clipboard_clear()
             self.clipboard_append(text)
-            # Ensure clipboard is updated immediately
             self.update_idletasks()
         except Exception:
             try:
                 import pyperclip  # type: ignore
                 pyperclip.copy(text)
-            except Exception:
-                pass
-
-    def _show_console_context_menu(self, event):  # noqa: ANN001
-        try:
-            # Enable/disable Copy based on selection presence
-            has_sel = False
-            try:
-                self.console_text.index('sel.first')
-                self.console_text.index('sel.last')
-                has_sel = True
-            except Exception:
-                has_sel = False
-            try:
-                self._console_menu.entryconfig(0, state=(tk.NORMAL if has_sel else tk.DISABLED))
-            except Exception:
-                pass
-            try:
-                # Clear Console should always be enabled, but guard in case menu missing
-                self._console_menu.entryconfig(1, state=tk.NORMAL)
-            except Exception:
-                pass
-            # Show the menu at cursor position
-            self._console_menu.tk_popup(event.x_root, event.y_root)
-        except Exception:
-            pass
-        finally:
-            try:
-                self._console_menu.grab_release()
-            except Exception:
-                pass
-        return 'break'
-
-    def _copy_console_selection(self) -> None:
-        """Copy current selection from console to clipboard and show a small toast."""
-        try:
-            start = self.console_text.index('sel.first')
-            end = self.console_text.index('sel.last')
-        except Exception:
-            return
-        try:
-            text = self.console_text.get(start, end)
-        except Exception:
-            text = ''
-        if not text:
-            return
-        self._copy_to_clipboard(text)
-        # Show a tiny toast near the mouse cursor
-        try:
-            x = self.winfo_pointerx()
-            y = self.winfo_pointery()
-            tw = tk.Toplevel(self)
-            tw.wm_overrideredirect(True)
-            tw.wm_geometry(f"+{x+10}+{y+10}")
-            lbl = tk.Label(tw, text='Copied', bg='#333333', fg='#ffffff', bd=0, padx=6, pady=3)
-            lbl.pack()
-            tw.after(700, tw.destroy)
-        except Exception:
-            pass
-
-    def _format_recent_text(self, sku: str, max_len: int = 28) -> str:
-        s = str(sku)
-        if len(s) <= max_len:
-            return s
-        return s[: max_len - 1] + '…'
-
-    def _clear_console(self) -> None:
-        """Remove all text from the console widget."""
-        try:
-            self.console_text.configure(state='normal')
-            self.console_text.delete('1.0', 'end')
-            self.console_text.configure(state='disabled')
-        except Exception:
-            pass
-
-    def _open_console_log(self) -> None:
-        try:
-            open_console_log_file(CONSOLE_FILE_LOGGER.path)
-        except Exception:
-            pass
+            except Exception as e:
+                self.show_error_dialog("Clipboard Error", "Failed to copy to clipboard. Please check your system clipboard support.")
+                try:
+                    import logging
+                    logging.error(f"Clipboard copy failed: {e}")
+                except Exception:
+                    pass
 
     def _show_toast(self, widget: tk.Widget, text: str, *, duration_ms: int = 900) -> None:
         try:
@@ -1025,106 +1006,65 @@ class MainWindow(ttk.Frame):
             tw = tk.Toplevel(widget)
             tw.wm_overrideredirect(True)
             tw.wm_geometry(f"+{x}+{y}")
-            lbl = tk.Label(tw, text=text, bg='#333333', fg='#ffffff', bd=0, padx=6, pady=3)
+            # Use a fallback font if emoji is not supported
+            try:
+                font = ('Segoe UI Emoji', 10) if self._is_emoji_font_supported() else ('Arial', 10)
+            except Exception:
+                font = ('Arial', 10)
+            lbl = tk.Label(tw, text=text, bg='#333333', fg='#ffffff', bd=0, padx=6, pady=3, font=font)
             lbl.pack()
-            # Auto-destroy
             tw.after(max(200, duration_ms), tw.destroy)
         except Exception:
             pass
 
-    # =================== UI UTILITIES ===================
-    def _install_global_deselect_handlers(self) -> None:
-        """Bind a global click to clear selection in console and suffix entry when clicking elsewhere."""
-        top = self.winfo_toplevel()
+    def _is_emoji_font_supported(self) -> bool:
+        """Detect if emoji font is likely supported on this platform."""
+        import platform
+        system = platform.system()
+        if system == 'Windows':
+            return True  # Segoe UI Emoji is present on modern Windows
+        elif system == 'Darwin':
+            return True  # Apple Color Emoji is present on macOS
+        else:
+            return False  # Most Linux distros lack emoji fonts by default
 
-        def is_descendant(child: tk.Widget | None, parent: tk.Widget | None) -> bool:
+    def _clear_console(self) -> None:
+        """Remove all text from the console widget. Robust to encoding and file errors."""
+        try:
+            self.console_text.configure(state='normal')
+            self.console_text.delete('1.0', 'end')
+            self.console_text.configure(state='disabled')
+        except Exception as e:
+            self.show_error_dialog("Console Error", f"Failed to clear console: {e}")
             try:
-                w = child
-                while w is not None:
-                    if w is parent:
-                        return True
-                    w = w.master  # type: ignore[attr-defined]
-            except Exception:
-                return False
-            return False
-
-        def on_click(event):  # noqa: ANN001
-            target = getattr(event, 'widget', None)
-            # Clear console selection if click is outside console (focus will naturally move to clicked widget)
-            try:
-                if not is_descendant(target, self.console_text):
-                    try:
-                        # Attempt to remove selection without changing state
-                        self.console_text.tag_remove('sel', '1.0', 'end')
-                    except Exception:
-                        # Fallback: toggle state temporarily
-                        try:
-                            prev = str(self.console_text.cget('state'))
-                            self.console_text.configure(state='normal')
-                            self.console_text.tag_remove('sel', '1.0', 'end')
-                            self.console_text.configure(state=prev)
-                        except Exception:
-                            pass
-                    # Ensure focus leaves the console: prefer clicked widget, else fallback to this frame
-                    try:
-                        if target is not None:
-                            target.focus_set()
-                        else:
-                            self.focus_set()
-                    except Exception:
-                        try:
-                            self.focus_set()
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-            # Clear suffix entry selection if click is outside suffix field
-            try:
-                if not is_descendant(target, getattr(self, '_suffix_entry', None)):
-                    try:
-                        self._suffix_entry.selection_clear()
-                    except Exception:
-                        pass
-                    # Persist suffix on click-away
-                    try:
-                        self._persist_suffix()
-                    except Exception:
-                        pass
-                    # Ensure focus leaves the suffix field similarly
-                    try:
-                        if target is not None:
-                            target.focus_set()
-                        else:
-                            self.focus_set()
-                    except Exception:
-                        try:
-                            self.focus_set()
-                        except Exception:
-                            pass
+                import logging
+                logging.error(f"Console clear failed: {e}")
             except Exception:
                 pass
 
+    def _open_console_log(self) -> None:
+        import platform, subprocess, os
         try:
-            top.bind_all('<Button-1>', on_click, add=True)
-        except Exception:
-            pass
-
-    def _on_click_create_sku_folder(self) -> None:
-        suffix = ''
-        try:
-            suffix = (self._suffix_var.get() or '').strip()
-        except Exception:
-            pass
-        # Delegate to app if available
-        try:
-            if callable(self._on_create_sku_folder):
-                self._on_create_sku_folder(suffix)  # type: ignore[misc]
+            path = CONSOLE_FILE_LOGGER.path
+            if not os.path.exists(path):
+                self.show_error_dialog("Log File Not Found", f"Log file does not exist: {path}")
                 return
-        except Exception:
-            pass
-        # Fallback: notify in console
-        self.console_neutral('Create SKU folder invoked (no handler wired).')
+            system = platform.system()
+            if system == 'Darwin':
+                subprocess.run(['open', path])
+            elif system == 'Windows':
+                subprocess.run(['cmd', '/c', 'start', '', path])
+            else:
+                subprocess.run(['xdg-open', path])
+        except Exception as e:
+            self.show_error_dialog("Open Log Error", f"Failed to open log file: {e}")
+            try:
+                import logging
+                logging.error(f"Open log failed: {e}")
+            except Exception:
+                pass
 
+    # -------------------- Global Hotkeys --------------------
     # Hotkeys intentionally not bound; recents are mouse/touch only
     def _bind_recent_hotkeys(self) -> None:
         """Bind number keys 1–7 to copy the corresponding recent SKU."""
@@ -1193,6 +1133,22 @@ class MainWindow(ttk.Frame):
                 top.bind_all(key, h, add=True)
             except Exception:
                 pass
+
+    def _on_click_create_sku_folder(self):
+        """Button handler for Create Folder: delegates to callback if provided."""
+        try:
+            if callable(self._on_create_sku_folder):
+                self._on_create_sku_folder( (self._suffix_var.get() or '').strip() )
+                return
+        except Exception:
+            pass
+        self.console_neutral('Create SKU folder invoked (no handler wired).')
+
+    def _format_recent_text(self, sku: str, max_len: int = 28) -> str:
+        s = str(sku)
+        if len(s) <= max_len:
+            return s
+        return s[: max_len - 1] + '…'
 
 
 class _Tooltip:

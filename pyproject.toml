@@ -17,6 +17,10 @@ dependencies = [
     "google-api-python-client>=2.130",
 ]
 
+[project.scripts]
+# CLI entrypoint to launch the app
+sjn = "sofa_jobs_navigator.app:run"
+
 [project.optional-dependencies]
 test = [
     "pytest>=7.4",
@@ -24,3 +28,14 @@ test = [
 
 [project.urls]
 Home = "https://example.com/sofa-jobs-navigator"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sofa_jobs_navigator*"]
+
+[tool.setuptools.package-data]
+# Include UI help assets (images + readme) in the wheel/sdist
+"sofa_jobs_navigator.ui.assets.help" = ["*.png", "*.md"]

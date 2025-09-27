@@ -7,18 +7,27 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from platformdirs import user_log_path
 from typing import Optional
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_LOG_PATH = _PROJECT_ROOT / "console_log.txt"
+# Default to user log directory to avoid permissions issues on installed packages
+_DEFAULT_LOG_DIR = user_log_path("sofa_jobs_navigator")
+_DEFAULT_LOG_PATH = _DEFAULT_LOG_DIR / "console_log.txt"
+# Backwards-compatibility: if a legacy project-root log exists, keep writing there
+_LEGACY_LOG_PATH = _PROJECT_ROOT / "console_log.txt"
 
 
 class ConsoleFileLogger:
     """Append console events to a plain-text log at the project root."""
 
     def __init__(self, path: Path | None = None) -> None:
-        self._path = path or _LOG_PATH
+        if path is not None:
+            self._path = path
+        else:
+            # Prefer legacy location only if it already exists; otherwise use user log dir
+            self._path = _LEGACY_LOG_PATH if _LEGACY_LOG_PATH.exists() else _DEFAULT_LOG_PATH
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._last_logged_date: Optional[_dt.date] = None
         self._initialise_last_logged_date()
@@ -86,7 +95,7 @@ class ConsoleFileLogger:
 def open_console_log_file(path: Path | None = None) -> None:
     """Open the console log in the system's default text editor."""
 
-    target = path or _LOG_PATH
+    target = path or CONSOLE_FILE_LOGGER.path
     try:
         target.touch(exist_ok=True)
     except Exception:

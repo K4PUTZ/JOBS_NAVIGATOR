@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sys
 import platform
+from pathlib import Path
 import tkinter as tk
 
 try:
@@ -25,6 +26,136 @@ def resource_path(relative_path: str) -> str:
     return os.path.join(base_path, relative_path)
 
 
+def _iter_candidate_paths() -> tuple[str | None, str | None]:
+    """Return best-effort (png_path, ico_path) by scanning common locations.
+
+    Search order:
+    1) Explicit override via env: SJN_ICON or SJN_ICON_FILE
+    2) PyInstaller MEIPASS if present
+    3) Nearby package/module directories and their parents
+    4) Known sibling project folders (JOBS NAVIGATOR, JOBS_NAVIGATOR, DRIVE_OPERATOR, NAVIGATOR)
+    5) UI help assets as a final PNG fallback (Sofa.png)
+    Matching is case-insensitive for robustness on Linux.
+    """
+
+    png_path: str | None = None
+    ico_path: str | None = None
+
+    # 1) Environment overrides
+    try:
+        env_icon = os.environ.get("SJN_ICON") or os.environ.get("SJN_ICON_FILE")
+        if env_icon:
+            p = Path(env_icon)
+            if p.is_file():
+                if p.suffix.lower() == ".png" and png_path is None:
+                    png_path = str(p)
+                if p.suffix.lower() == ".ico" and ico_path is None:
+                    ico_path = str(p)
+                if png_path or ico_path:
+                    return png_path, ico_path
+            elif p.is_dir():
+                # Look for common filenames inside the directory
+                for cand in ["sofa_icon.png", "sofa_icon_128.png", "sofa.png", "Sofa.png", "sofa_icon.ico"]:
+                    q = p / cand
+                    if q.exists():
+                        if q.suffix.lower() == ".png" and png_path is None:
+                            png_path = str(q)
+                        if q.suffix.lower() == ".ico" and ico_path is None:
+                            ico_path = str(q)
+                if png_path or ico_path:
+                    return png_path, ico_path
+    except Exception:
+        pass
+
+    # 2) Build list of directories to probe
+    dirs: list[Path] = []
+    try:
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            dirs.append(Path(meipass))
+    except Exception:
+        pass
+
+    mod_dir = Path(__file__).resolve().parent
+    dirs.extend([mod_dir, mod_dir.parent, mod_dir.parent / "ui" / "assets" / "help"])  # package + help assets
+
+    # Also probe parents up to 5 levels (covers src/, project root, etc.)
+    for i, parent in enumerate(mod_dir.parents):
+        if i >= 5:
+            break
+        dirs.append(parent)
+        # Common sibling project folders at each level
+        for sibling in ("JOBS NAVIGATOR", "JOBS_NAVIGATOR", "DRIVE_OPERATOR", "NAVIGATOR"):
+            dirs.append(parent / sibling)
+
+    # 3) Define preferred filenames (case-insensitive match)
+    name_order = [
+        # preferred PNGs
+        "sofa_icon.png",
+        "sofa_icon_128.png",
+        "sofa.png",
+        "Sofa.png",
+        # ICO fallbacks
+        "sofa_icon.ico",
+    ]
+
+    def find_in_dir(d: Path) -> None:
+        nonlocal png_path, ico_path
+        try:
+            if not d.exists() or not d.is_dir():
+                return
+            lower_map = {p.name.lower(): p for p in d.iterdir() if p.is_file()}
+            for nm in name_order:
+                p = lower_map.get(nm.lower())
+                if p is None:
+                    continue
+                if p.suffix.lower() == ".png" and png_path is None:
+                    png_path = str(p)
+                if p.suffix.lower() == ".ico" and ico_path is None:
+                    ico_path = str(p)
+                if png_path and ico_path:
+                    return
+        except Exception:
+            return
+
+    for d in dirs:
+        find_in_dir(d)
+        if png_path and ico_path:
+            break
+
+    # 4) As a last resort, try resource_path for classic relative candidates
+    try:
+        icon_candidates = [
+            # Prefer PNGs
+            "sofa_icon.png",
+            os.path.join("JOBS NAVIGATOR", "sofa_icon.png"),
+            os.path.join("JOBS_NAVIGATOR", "sofa_icon.png"),
+            os.path.join("DRIVE_OPERATOR", "sofa_icon.png"),
+            # Fallback smaller PNG if the main one is missing
+            "sofa_icon_128.png",
+            os.path.join("JOBS NAVIGATOR", "sofa_icon_128.png"),
+            os.path.join("JOBS_NAVIGATOR", "sofa_icon_128.png"),
+            os.path.join("DRIVE_OPERATOR", "sofa_icon_128.png"),
+            # ICO fallbacks (mostly for Windows)
+            "sofa_icon.ico",
+            os.path.join("JOBS NAVIGATOR", "sofa_icon.ico"),
+            os.path.join("JOBS_NAVIGATOR", "sofa_icon.ico"),
+            os.path.join("DRIVE_OPERATOR", "sofa_icon.ico"),
+            os.path.join("NAVIGATOR", "sofa_icon.ico"),
+        ]
+        for cand in icon_candidates:
+            p = resource_path(cand)
+            if os.path.exists(p):
+                if p.lower().endswith(".png") and png_path is None:
+                    png_path = p
+                if p.lower().endswith(".ico") and ico_path is None:
+                    ico_path = p
+    except Exception:
+        pass
+
+    return png_path, ico_path
+
+
 def set_app_icon(window: tk.Misc) -> None:
     """Set the application icon where possible.
 
@@ -35,34 +166,7 @@ def set_app_icon(window: tk.Misc) -> None:
     Searches for common icon file names in both this project and DRIVE_OPERATOR.
     """
 
-    icon_candidates = [
-        # Prefer PNGs
-        "sofa_icon.png",
-        os.path.join("JOBS NAVIGATOR", "sofa_icon.png"),
-        os.path.join("JOBS_NAVIGATOR", "sofa_icon.png"),
-        os.path.join("DRIVE_OPERATOR", "sofa_icon.png"),
-        # Fallback smaller PNG if the main one is missing
-        "sofa_icon_128.png",
-        os.path.join("JOBS NAVIGATOR", "sofa_icon_128.png"),
-        os.path.join("JOBS_NAVIGATOR", "sofa_icon_128.png"),
-        os.path.join("DRIVE_OPERATOR", "sofa_icon_128.png"),
-        # ICO fallbacks (mostly for Windows)
-        "sofa_icon.ico",
-        os.path.join("JOBS NAVIGATOR", "sofa_icon.ico"),
-        os.path.join("JOBS_NAVIGATOR", "sofa_icon.ico"),
-        os.path.join("DRIVE_OPERATOR", "sofa_icon.ico"),
-        os.path.join("NAVIGATOR", "sofa_icon.ico"),
-    ]
-
-    ico_path = None
-    png_path = None
-    for cand in icon_candidates:
-        p = resource_path(cand)
-        if os.path.exists(p):
-            if p.lower().endswith(".png") and png_path is None:
-                png_path = p
-            if p.lower().endswith(".ico") and ico_path is None:
-                ico_path = p
+    png_path, ico_path = _iter_candidate_paths()
     system = platform.system()
 
     # Try best option per platform
