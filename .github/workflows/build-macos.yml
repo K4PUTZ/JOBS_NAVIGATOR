@@ -1,0 +1,43 @@
+name: Build macOS DMG
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ main ]
+
+jobs:
+  build-macos:
+    name: Build macOS DMG (macos-latest)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install system deps
+        run: |
+          brew update || true
+          brew install icnsutils || true
+
+      - name: Build .app and .dmg
+        run: |
+          chmod +x "packaging/macos/build_mac.sh"
+          bash "packaging/macos/build_mac.sh"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sofa-jobs-navigator-macos
+          path: |
+            dist/Sofa Jobs Navigator.app
+            dist/Sofa Jobs Navigator.dmg
+            dist/Sofa Jobs Navigator.dmg.sha256
+
+      - name: Run smoke test (optional)
+        run: |
+          chmod +x packaging/macos/smoke_test.sh || true
+          packaging/macos/smoke_test.sh || true

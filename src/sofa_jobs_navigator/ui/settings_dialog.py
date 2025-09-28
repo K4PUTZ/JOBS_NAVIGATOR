@@ -6,6 +6,10 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from typing import Callable
+import threading
+import subprocess
+from pathlib import Path
+import os
 import os
 
 from ..config.settings import Favorite, Settings
@@ -214,6 +218,8 @@ class SettingsDialog(tk.Toplevel):
         # Buttons row (moved below the new content)
         btns = ttk.Frame(frame)
         btns.grid(row=10, column=0, columnspan=3, pady=(12, 0))
+        # Update button on the left, Save/Cancel on the right
+        ttk.Button(btns, text='Check for Updates…', command=self._on_check_for_updates).pack(side='left')
         ttk.Button(btns, text='Save', command=self._on_press_save).pack(side='right')
         ttk.Button(btns, text='Cancel', command=self.destroy).pack(side='right', padx=(0, 6))
 
@@ -290,6 +296,74 @@ class SettingsDialog(tk.Toplevel):
             self._working_entry.configure(state='readonly')
         except Exception:
             pass
+
+    def _on_check_for_updates(self) -> None:
+        """Trigger a minimal auto-update helper (downloads + sha256 verify).
+
+        The update URLs may be provided via environment variables:
+        - SJN_UPDATE_URL
+        - SJN_UPDATE_SHA_URL
+
+        The app will attempt to use a bundled `auto_update.sh` when present
+        under the app Resources or fall back to the repository `packaging/macos` script.
+        """
+        # Locate URLs
+        update_url = os.environ.get('SJN_UPDATE_URL')
+        update_sha = os.environ.get('SJN_UPDATE_SHA_URL')
+        if not update_url or not update_sha:
+            messagebox.showinfo(
+                title='Update not configured',
+                message=(
+                    'Auto-update is not configured for this build.\n\n'
+                    'To enable, set environment variables SJN_UPDATE_URL and SJN_UPDATE_SHA_URL pointing to the artifact and its SHA256 file.\n\n'
+                    'You can also use the manual updater script in packaging/macos/auto_update.sh'
+                ),
+                parent=self,
+            )
+            return
+
+        ok = messagebox.askyesno(title='Check for updates', message='Check for updates now?', parent=self)
+        if not ok:
+            return
+
+        # Find helper script: prefer runtime Resources path inside bundle when available
+        helper_candidates = []
+        try:
+            # If running from an installed .app, find Resources next to this module
+            mod_path = Path(__file__).resolve()
+            app_root = mod_path.parents[4]  # .../Contents/Resources/<pkg>/../../..
+            resources_helper = app_root / 'Resources' / 'auto_update.sh'
+            helper_candidates.append(resources_helper)
+        except Exception:
+            pass
+        # Repo packaging helper as fallback
+        repo_helper = Path(__file__).resolve().parents[3] / 'packaging' / 'macos' / 'auto_update.sh'
+        helper_candidates.append(repo_helper)
+
+        helper = None
+        for c in helper_candidates:
+            if c and c.exists() and os.access(str(c), os.X_OK):
+                helper = str(c)
+                break
+
+        if helper is None:
+            messagebox.showerror(title='Updater not found', message='Auto-update helper script not found in bundle or repo.', parent=self)
+            return
+
+        # Run helper in background thread to keep UI responsive
+        def _run_update():
+            try:
+                proc = subprocess.run([helper, update_url, update_sha, '/Applications'], capture_output=True, text=True)
+                if proc.returncode == 0:
+                    # Success - notify on main thread
+                    self.after(0, lambda: messagebox.showinfo(title='Update installed', message='Update installed successfully. Check /Applications.', parent=self))
+                else:
+                    out = proc.stdout + '\n' + proc.stderr
+                    self.after(0, lambda: messagebox.showerror(title='Update failed', message=f'Update failed (exit {proc.returncode}).\n\n{out}', parent=self))
+            except Exception as exc:
+                self.after(0, lambda: messagebox.showerror(title='Update error', message=str(exc), parent=self))
+
+        threading.Thread(target=_run_update, daemon=True).start()
 
 
 
