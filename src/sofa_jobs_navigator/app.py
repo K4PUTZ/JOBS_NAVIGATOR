@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import os
 import subprocess
 import webbrowser
@@ -35,6 +35,11 @@ from platformdirs import user_log_path
 def run() -> None:
     settings_manager = SettingsManager()
     settings = settings_manager.load()
+    # First session if counter is 0
+    try:
+        first_session = bool(getattr(settings, 'session_count', 0) == 0)
+    except Exception:
+        first_session = False
     recent_history = RecentSKUHistory(settings)
     last_sku: str | None = None
 
@@ -598,29 +603,27 @@ def run() -> None:
         """
         if FLAGS.offline_mode:
             return
+        # If user opted in to auto-connect, attempt it regardless of cached state
         try:
-            if auth_service.has_valid_credentials():
-                # Only proceed automatically if user opted in via settings
-                if bool(getattr(settings, 'connect_on_startup', False)):
-                    _attempt_auto_connect()
-                else:
-                    LOGGER.info('auth.valid_cached_creds_startup_no_autoconnect')
+            if bool(getattr(settings, 'connect_on_startup', False)):
+                _attempt_auto_connect()
                 return
         except Exception:
             pass
-        # No valid credentials; optionally ask user depending on setting
+        # Otherwise, optionally prompt (disabled by default)
         try:
-            prompt_enabled = bool(getattr(settings, 'prompt_for_connect_on_startup', True))
+            prompt_enabled = bool(getattr(settings, 'prompt_for_connect_on_startup', False))
         except Exception:
             prompt_enabled = True
         if prompt_enabled:
-            try:
-                ok = messagebox.askyesno(
-                    title='Connect to Google Drive?',
-                    message='You are not connected to Google Drive yet. Connect now?'
-                )
-            except Exception:
-                ok = False
+            ok, set_auto = _ask_connect_prompt_with_autocheck(root)
+            if set_auto:
+                try:
+                    settings.connect_on_startup = True
+                    settings.prompt_for_connect_on_startup = False
+                    settings_manager.save(settings)
+                except Exception:
+                    pass
         else:
             ok = False
         if ok:
@@ -836,7 +839,14 @@ def run() -> None:
                 # Continue silently if Welcome Window fails
 
     try:
-        root.after(500, _maybe_prompt_setup)
+        root.after(300 if first_session else 500, _maybe_prompt_setup)
+    except Exception:
+        pass
+
+    # Increment session counter and persist once UI is scheduled
+    try:
+        settings.session_count = int(getattr(settings, 'session_count', 0) or 0) + 1
+        settings_manager.save(settings)
     except Exception:
         pass
 
@@ -844,6 +854,77 @@ def run() -> None:
 
 
 # =================== END APPLICATION BOOT ===================
+
+
+def _ask_connect_prompt_with_autocheck(parent: tk.Misc) -> tuple[bool, bool]:
+    """Modal prompt asking to connect now, with an 'Auto-connect on startup' checkbox.
+
+    Returns (do_connect, auto_connect_on_startup).
+    """
+    win = tk.Toplevel(parent)
+    try:
+        win.title('Connect to Google Drive?')
+        win.transient(parent)
+        win.grab_set()
+        win.resizable(False, False)
+    except Exception:
+        pass
+
+    res = {'ok': False, 'auto': False}
+
+    frame = ttk.Frame(win, padding=12)
+    frame.pack(fill='both', expand=True)
+    ttk.Label(frame, text='You are not connected to Google Drive yet. Connect now?').pack(anchor='w')
+    ttk.Frame(frame, height=8).pack(fill='x')
+    auto_var = tk.BooleanVar(value=False)
+    ttk.Checkbutton(frame, text='Auto-connect on startup', variable=auto_var).pack(anchor='w')
+
+    btns = ttk.Frame(frame)
+    btns.pack(fill='x', pady=(12, 0))
+
+    def _ok() -> None:
+        res['ok'] = True
+        res['auto'] = bool(auto_var.get())
+        try:
+            win.destroy()
+        except Exception:
+            pass
+
+    def _cancel() -> None:
+        res['ok'] = False
+        res['auto'] = bool(auto_var.get())
+        try:
+            win.destroy()
+        except Exception:
+            pass
+
+    ttk.Button(btns, text='Connect', command=_ok).pack(side='right')
+    ttk.Button(btns, text='Not now', command=_cancel).pack(side='right', padx=(0, 6))
+
+    # Center over parent
+    try:
+        win.update_idletasks()
+        px = parent.winfo_rootx(); py = parent.winfo_rooty()
+        pw = parent.winfo_width() or parent.winfo_reqwidth()
+        ph = parent.winfo_height() or parent.winfo_reqheight()
+        w = win.winfo_width() or win.winfo_reqwidth()
+        h = win.winfo_height() or win.winfo_reqheight()
+        x = px + max((pw - w)//2, 0)
+        y = py + max((ph - h)//2, 0)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+    except Exception:
+        pass
+
+    try:
+        win.bind('<Escape>', lambda e: _cancel())
+    except Exception:
+        pass
+
+    try:
+        parent.wait_window(win)
+    except Exception:
+        pass
+    return bool(res['ok']), bool(res['auto'])
 
 
 if __name__ == '__main__':

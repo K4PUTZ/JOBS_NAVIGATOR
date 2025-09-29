@@ -198,11 +198,16 @@ class WelcomeWindow(tk.Toplevel):
             # Page 1 (index 0): Check connection status
             if self._current_page == 0 and callable(self._cb_is_connected):
                 if not bool(self._cb_is_connected()):
-                    messagebox.showwarning(
+                    proceed = messagebox.askyesno(
                         title='Not Connected',
-                        message='You are not connected to Google Drive. You won\'t be able to search for remote folders until you connect.\n\nYou can press F11 later to open Settings and connect.',
+                        message=(
+                            "You are not connected to Google Drive. You won't be able to search remote folders until you connect.\n\n"
+                            "Proceed without connecting now? You can press F11 later to open Settings and connect."
+                        ),
                         parent=self,
                     )
+                    if not proceed:
+                        return
             
             # Page 6 (index 5): Validate working folder
             if self._current_page == 5 and self._settings is not None:
@@ -236,9 +241,14 @@ class WelcomeWindow(tk.Toplevel):
         if self._current_page == self._page_count - 1 and self._settings is not None:
             try:
                 # Save settings from distributed pages:
-                # Page 1: Connect on Startup
+                # Page 1: Connect on Startup (and suppress prompts when enabled)
                 if hasattr(self, '_connect_var'):
                     self._settings.connect_on_startup = bool(self._connect_var.get())
+                    try:
+                        if self._settings.connect_on_startup and hasattr(self._settings, 'prompt_for_connect_on_startup'):
+                            self._settings.prompt_for_connect_on_startup = False
+                    except Exception:
+                        pass
                 # Page 2: Auto-search clipboard after connect  
                 if hasattr(self, '_auto_search_after_var'):
                     self._settings.auto_search_clipboard_after_connect = bool(self._auto_search_after_var.get())
@@ -251,6 +261,9 @@ class WelcomeWindow(tk.Toplevel):
                 # Page 7: Sounds On only (Prompt to connect removed as requested)
                 if hasattr(self, '_sounds_var'):
                     self._settings.sounds_enabled = bool(self._sounds_var.get())
+                # Page 7: Show Welcome on Startup
+                if hasattr(self, '_show_welcome_var'):
+                    self._settings.show_help_on_startup = bool(self._show_welcome_var.get())
                 
                 if callable(self._cb_save_settings):
                     self._cb_save_settings()
@@ -325,7 +338,7 @@ class WelcomeWindow(tk.Toplevel):
                 # Add Connect on Startup checkbox (centered below)
                 connect_cb_frame = ttk.Frame(self._extra_frame)
                 connect_cb_frame.pack(pady=(8, 0))
-                connect_default = True  # Default to True in Welcome
+                connect_default = True  # Checked in Welcome to set up auto-connect going forward
                 self._connect_var = tk.BooleanVar(value=connect_default)
                 ttk.Checkbutton(connect_cb_frame, variable=self._connect_var).pack(side='left', padx=(0, 6))
                 ttk.Label(connect_cb_frame, text='Connect on Startup').pack(side='left')
@@ -374,7 +387,7 @@ class WelcomeWindow(tk.Toplevel):
                 # Store the actual path separately for validation
                 self._actual_wf_path = current
             elif p == 6:
-                # Page 7: Final settings page with remaining controls (only Sounds On)
+                # Page 7: Final settings page with remaining controls (Sounds + Show Welcome)
                 # Initialize variables for any controls not yet created on other pages
                 if not hasattr(self, '_sounds_var'):
                     sounds_default = True
@@ -385,7 +398,17 @@ class WelcomeWindow(tk.Toplevel):
                 sounds_cb_frame.pack()
                 ttk.Checkbutton(sounds_cb_frame, variable=self._sounds_var).pack(side='left', padx=(0, 6))
                 ttk.Label(sounds_cb_frame, text='Sounds On').pack(side='left')
-                
+
+                # Show Welcome on Startup toggle
+                for _ in range(1):
+                    ttk.Frame(self._extra_frame, height=8).pack(fill='x')
+                show_welcome_frame = ttk.Frame(self._extra_frame)
+                show_welcome_frame.pack()
+                default_sw = True if self._settings is None else bool(getattr(self._settings, 'show_help_on_startup', True))
+                self._show_welcome_var = tk.BooleanVar(value=default_sw)
+                ttk.Checkbutton(show_welcome_frame, variable=self._show_welcome_var).pack(side='left', padx=(0, 6))
+                ttk.Label(show_welcome_frame, text='Show Welcome Window on Startup').pack(side='left')
+
                 # Add Home key instruction
                 for _ in range(2):
                     ttk.Frame(self._extra_frame, height=8).pack(fill='x')

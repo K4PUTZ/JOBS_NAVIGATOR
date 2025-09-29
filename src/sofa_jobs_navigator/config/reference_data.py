@@ -50,7 +50,7 @@ DRIVE_BACKUP_NAMES = {
 # --------------------------------------------------------------
 
 DEFAULT_SHORTCUTS = [
-    {"label": "AV_QC", "path": "", "notes": "Fixed shared drive folder"},
+    {"label": "Root Folder", "path": "", "notes": "Opens the SKU root folder"},
     {"label": "Trailer / Video IN", "path": "02-TRAILER/VIDEO IN"},
     {"label": "Artes", "path": "EXPORT/03- ARTES"},
     {"label": "Marketing / Social", "path": "EXPORT/03- ARTES/06- MARKETING/SOCIAL"},

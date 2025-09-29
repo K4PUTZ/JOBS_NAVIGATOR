@@ -1,11 +1,15 @@
+[22:02:20] [ACCOUNT] Authenticated account: (signed out)
 
-
-======== 2025-09-27 - Saturday ========
-[15:05:01] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[15:05:01] [SKU] Detected SKU: LOVE_SOFA_20150311_0864
-[15:05:34] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[15:05:34] [SKU] Detected SKU: MYSOLEDESIRE_2022_TT23741080_M
-[15:08:45] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[15:08:45] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[15:08:45] [SKU] Detected SKU: MYSOLEDESIRE_2022_TT23741080_M
-[18:22:48] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+======== 2025-09-29 - Monday ========
+[13:28:12] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[13:28:16] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[13:28:16] [SKU] Detected SKU: WEEKENDINTAIPEI_SOFA_20241031_5069
+[13:41:57] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[13:41:57] [SKU] Detected SKU: ARCADIAN_SOFA_20240523_4838
+[14:13:15] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[14:13:23] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[14:13:23] [SKU] Detected SKU: WEEKENDINTAIPEI_SOFA_20241031_5069
+[15:47:14] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[16:05:53] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[16:29:04] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[16:29:42] [ACCOUNT] Authenticated account: mateus@sofadigital.com

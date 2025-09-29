@@ -33,15 +33,19 @@ class Settings:
     sounds_enabled: bool = True
     connect_on_startup: bool = False
     # If True, show a connect prompt when no valid credentials exist at startup (unless offline)
-    prompt_for_connect_on_startup: bool = True
+    # Default is False for a calmer first experience; we suggest enabling auto-connect later.
+    prompt_for_connect_on_startup: bool = False
     # If True, after a successful startup connect (auto or prompted) perform a clipboard SKU auto-search
-    auto_search_clipboard_after_connect: bool = False
+    # Default True to speed up first actions after connect.
+    auto_search_clipboard_after_connect: bool = True
     # If True, when multiple SKUs are detected they are auto-loaded into Recents (up to 7) without prompting
     auto_load_multi_skus_without_prompt: bool = False
     # When enabled, automatically open the SKU root in the browser when a SKU is found
     open_root_on_sku_found: bool = False
     recent_skus: List[str] = field(default_factory=list)
     show_help_on_startup: bool = True
+    # Incremented on each successful app start. 0 means "first session".
+    session_count: int = 0
 
 
 # =================== SETTINGS MANAGER ===================
@@ -68,12 +72,13 @@ class SettingsManager:
             save_recent_skus=raw.get('save_recent_skus', True),
             sounds_enabled=raw.get('sounds_enabled', True),
             connect_on_startup=raw.get('connect_on_startup', False),
-            prompt_for_connect_on_startup=raw.get('prompt_for_connect_on_startup', True),
-            auto_search_clipboard_after_connect=raw.get('auto_search_clipboard_after_connect', False),
+            prompt_for_connect_on_startup=raw.get('prompt_for_connect_on_startup', False),
+            auto_search_clipboard_after_connect=raw.get('auto_search_clipboard_after_connect', True),
             auto_load_multi_skus_without_prompt=raw.get('auto_load_multi_skus_without_prompt', False),
             open_root_on_sku_found=raw.get('open_root_on_sku_found', False),
             recent_skus=raw.get('recent_skus', []),
             show_help_on_startup=raw.get('show_help_on_startup', True),
+            session_count=int(raw.get('session_count', 0) or 0),
         )
 
     def save(self, settings: Settings) -> None:
@@ -93,6 +98,7 @@ class SettingsManager:
             'open_root_on_sku_found': getattr(settings, 'open_root_on_sku_found', False),
             'recent_skus': settings.recent_skus,
             'show_help_on_startup': settings.show_help_on_startup,
+            'session_count': int(getattr(settings, 'session_count', 0) or 0),
         }
         with self._config_path.open('w', encoding='utf-8') as fh:
             json.dump(payload, fh, indent=2)
@@ -102,7 +108,7 @@ class SettingsManager:
         # Guarantee at least 8 entries even if defaults change
         while len(favorites) < 8:
             favorites.append(Favorite(label='', path='', hotkey=None))
-        return Settings(favorites=favorites, recent_skus=[])
+        return Settings(favorites=favorites, recent_skus=[], session_count=0)
 
 
 # =================== END SETTINGS MANAGER ===================

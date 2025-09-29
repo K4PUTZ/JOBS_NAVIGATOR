@@ -28,6 +28,7 @@ if str(SRC) not in sys.path:
 
 # Import only the lightweight version helper early so `--version` works
 from sofa_jobs_navigator.version import app_display_title  # noqa: E402
+from sofa_jobs_navigator.maintenance.factory_reset import perform_factory_reset  # noqa: E402
 
 import tkinter as tk  # noqa: E402
 
@@ -37,6 +38,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Sofa Jobs Navigator")
     parser.add_argument("--auto-quit-ms", type=int, default=None, help="Auto-quit the app after N milliseconds (testing)")
     parser.add_argument("-V", "--version", action="store_true", help="Print version and exit")
+    parser.add_argument("--factory-reset", action="store_true", help="Reset user config, tokens and logs before launch")
     return parser.parse_args()
 
 
@@ -60,6 +62,17 @@ if __name__ == "__main__":
     if args.version:
         print(app_display_title())
         raise SystemExit(0)
+    # Optional factory reset triggers (CLI or env var)
+    try:
+        env_reset = os.environ.get("SJN_FACTORY_RESET", "").strip().lower() in {"1", "true", "yes", "on"}
+    except Exception:
+        env_reset = False
+    do_reset = bool(getattr(args, "factory_reset", False) or env_reset)
+    if do_reset:
+        try:
+            perform_factory_reset(verbose=True)
+        except Exception:
+            pass
     # Monkey-patch tk.Tk to inject auto-quit scheduling after window creation
     _orig_tk = tk.Tk
 

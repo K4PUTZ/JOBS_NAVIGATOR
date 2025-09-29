@@ -1,12 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
+
+datas = [('sofa_icon.png', '.'), ('src/sofa_jobs_navigator/ui/assets/help/*.png', 'sofa_jobs_navigator/ui/assets/help'), ('src/sofa_jobs_navigator/ui/assets/help/README.md', 'sofa_jobs_navigator/ui/assets/help')]
+binaries = []
+hiddenimports = []
+tmp_ret = collect_all('googleapiclient')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('google_auth_oauthlib')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['packaging/macos/_sjn_entry.py'],
-    pathex=['/Volumes/Expansion/----- PESSOAL -----/PYTHON/JOBS NAVIGATOR/packaging/macos/../../../JOBS NAVIGATOR/src'],
-    binaries=[('/Library/Frameworks/Python.framework/Versions/3.11/Python', '_internal/Python')],
-    datas=[('/Volumes/Expansion/----- PESSOAL -----/PYTHON/JOBS NAVIGATOR/packaging/macos/../../../JOBS NAVIGATOR/sofa_icon.icns', '.')],
-    hiddenimports=[],
+    ['run.py'],
+    pathex=[],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -32,6 +41,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['sofa_icon.icns'],
 )
 coll = COLLECT(
     exe,
