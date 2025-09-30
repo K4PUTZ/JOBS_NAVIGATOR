@@ -72,63 +72,10 @@ if [[ ! -e "$BIN_PATH" ]]; then
   exit 1
 fi
 
-echo "[3/4] Creating launch helpers..."
+echo "[3/5] Creating launch helpers..."
 if [[ "$MODE" == "app" ]]; then
-  # Launchers that use `open` so Terminal is not required
-  LAUNCHER="dist/Launch.command"
-  cat >"$LAUNCHER" <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-APP="Sofa Jobs Navigator.app"
-DIR="$(cd "$(dirname "$0")" && pwd)"
-open -n "$DIR/$APP" --args "$@"
-SH
-  chmod +x "$LAUNCHER"
-
-  RESET_CMD="dist/Reset.command"
-  cat >"$RESET_CMD" <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-APP="Sofa Jobs Navigator.app"
-DIR="$(cd "$(dirname "$0")" && pwd)"
-open -n "$DIR/$APP" --args --factory-reset "$@"
-SH
-  chmod +x "$RESET_CMD"
-
-  # Build a Launcher.app (separate name to avoid conflicts) using AppleScript
-  if command -v osacompile >/dev/null 2>&1; then
-    LAUNCHER_APP="dist/$APP_NAME Launcher.app"
-    TMP_SCPT="dist/_launcher.scpt.txt"
-    cat >"$TMP_SCPT" <<'APPLESCRIPT'
-on run argv
-  try
-    set launcherApp to POSIX path of (path to me)
-    set distDir to do shell script "dirname " & quoted form of launcherApp
-    set appPath to distDir & "/Sofa Jobs Navigator.app"
-    tell application "Terminal"
-      activate
-      do script "clear; echo '========================================'; echo '  Sofa Jobs Navigator'; echo '  Launching...'; echo '========================================'; sleep 1; exit" in (make new window)
-    end tell
-    delay 1.0
-    do shell script "open -n " & quoted form of appPath
-    delay 0.3
-    try
-      tell application "Sofa Jobs Navigator" to activate
-    end try
-    delay 0.3
-    try
-      tell application "Terminal" to close front window saving no
-    end try
-  end try
-end run
-APPLESCRIPT
-    osacompile -o "$LAUNCHER_APP" "$TMP_SCPT"
-    # Apply custom icon to launcher app
-    if [[ -f "$ICON_ICNS" ]]; then
-      cp "$ICON_ICNS" "$LAUNCHER_APP/Contents/Resources/applet.icns" || true
-    fi
-    rm -f "$TMP_SCPT"
-  fi
+  # Keep it simple: only the .app bundle is produced (no extra launchers).
+  :
 else
   # Console mode launchers inside the folder
   LAUNCHER="$DIST_DIR/Run.command"
@@ -149,18 +96,38 @@ SH
   chmod +x "$RESET_CMD"
 fi
 
-echo "[4/4] Writing quickstart README..."
+echo "[4/5] Applying bundle metadata and writing quickstart README..."
+# Inject version into the app's Info.plist (Finder shows it)
+if [[ "$MODE" == "app" ]]; then
+  VERSION_PY="src/sofa_jobs_navigator/version.py"
+  if [[ -f "$VERSION_PY" ]]; then
+    VERSION=$(python3 -c "import re,pathlib; p=pathlib.Path('src/sofa_jobs_navigator/version.py').read_text(encoding='utf-8'); m=re.search(r'^VERSION(?:\\s*:\\s*[^=]+)?\\s*=\\s*[\\\"\\\']([^\\\"\\\']+)[\\\"\\\']', p, flags=re.M); print(m.group(1) if m else '0.0.0')" 2>/dev/null || echo '0.0.0')
+    INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
+    if [[ -f "$INFO_PLIST" ]]; then
+      if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
+        /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO_PLIST" 2>/dev/null || \
+        /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$INFO_PLIST"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO_PLIST" 2>/dev/null || \
+        /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$INFO_PLIST"
+      else
+        defaults write "${INFO_PLIST%.plist}" CFBundleShortVersionString "$VERSION" || true
+        defaults write "${INFO_PLIST%.plist}" CFBundleVersion "$VERSION" || true
+      fi
+      echo "[info] Set app version to $VERSION in Info.plist"
+    fi
+  fi
+fi
 cat >"$DIST_DIR/README-FIRST.txt" <<'TXT'
 Sofa Jobs Navigator (macOS beta)
 ================================
 
 How to run:
- - Double-click the app: Sofa Jobs Navigator.app (recommended), or
- - Double-click: Launch.command (runs the app via open), or
- - Terminal (console build only): cd into the folder and run: ./"Sofa Jobs Navigator"
+ - Double-click the app: Sofa Jobs Navigator.app (recommended)
+ - Console build only: cd into the folder and run: ./"Sofa Jobs Navigator"
  
  Reset preferences:
- - To clear preferences/tokens/logs any time, double-click: Reset.command
+ - In-app: use the Reset option from the menu
+ - Terminal: open -n "Sofa Jobs Navigator.app" --args --factory-reset
  
  First run (Google credentials):
  - Put your OAuth client JSON as credentials.json here:
@@ -177,6 +144,21 @@ Logs:
 TXT
 
 echo
+echo "[5/5] Creating DMG..."
+if [[ "$MODE" == "app" ]]; then
+  DMG_PATH="dist/$APP_NAME.dmg"
+  hdiutil create -volname "$APP_NAME" -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG_PATH" >/dev/null
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$DMG_PATH" > "${DMG_PATH}.sha256"
+  fi
+fi
+
+echo
 echo "Build complete: $DIST_DIR"
-echo "- Double-click: $LAUNCHER"
-echo "- Or run: \"$BIN_PATH\""
+if [[ "$MODE" == "app" ]]; then
+  echo "- Double-click the app bundle to launch."
+  echo "- DMG: $(basename "$DMG_PATH")"
+else
+  echo "- Double-click: $LAUNCHER"
+  echo "- Or run: \"$BIN_PATH\""
+fi

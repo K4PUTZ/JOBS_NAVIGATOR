@@ -10,22 +10,23 @@ Prerequisites
 
 Build
 - From repository root: ./packaging/macos/build.sh
-- Output: dist/Sofa Jobs Navigator/
-  - Sofa Jobs Navigator        # bundled executable (Python + deps included)
-  - Run.command                # double-click to open Terminal and start the app
-  - README-FIRST.txt           # quickstart
+- Output (app mode):
+  - dist/Sofa Jobs Navigator.app   # app bundle to distribute
+  - dist/Sofa Jobs Navigator.dmg   # compressed disk image with the app
+  - dist/Sofa Jobs Navigator.dmg.sha256
+  - dist/README-FIRST.txt          # quickstart
 
 First Run (OAuth client)
 - Place credentials.json at: ~/Library/Application Support/sofa_jobs_navigator/credentials.json
 - Or set env var SJN_CREDENTIALS_FILE=/path/to/credentials.json before launching.
 
 Gatekeeper (unsigned beta)
-- First-time warning is expected. Right-click Run.command -> Open and confirm, or remove quarantine:
-  xattr -dr com.apple.quarantine "dist/Sofa Jobs Navigator"
+- First-time warning is expected. For the app bundle, right-click -> Open and confirm.
+- For the DMG, some systems may still mark as quarantined. You can remove quarantine:
+  xattr -dr com.apple.quarantine "dist/Sofa Jobs Navigator.dmg"
 
 Notes
-- The build uses PyInstaller onedir mode to include the Python runtime and all required libraries (no separate Python install needed).
+- The build uses PyInstaller onedir mode within the .app bundle to include the Python runtime and all required libraries (no separate Python install needed).
 - Tk/ttk is bundled automatically via PyInstaller’s tkinter hook.
 - Help assets and icons are included for in-app usage.
 - For wider distribution, consider codesigning and notarization later.
-

@@ -1,0 +1,35 @@
+name: Build Windows ZIP
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    name: Build Windows (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build Windows artifact (PyInstaller onedir)
+        shell: pwsh
+        run: |
+          Set-Location "$env:GITHUB_WORKSPACE"
+          pwsh -File "packaging/windows/build.ps1"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sofa-jobs-navigator-windows
+          path: |
+            dist/Sofa Jobs Navigator/
+            dist/Sofa_Jobs_Navigator.zip
+            dist/README-FIRST.txt
+

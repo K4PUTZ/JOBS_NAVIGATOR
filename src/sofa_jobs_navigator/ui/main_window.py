@@ -1043,21 +1043,15 @@ class MainWindow(ttk.Frame):
                 pass
 
     def _open_console_log(self) -> None:
-        import platform, subprocess, os
+        """Open the console log, creating an empty file if missing."""
         try:
-            path = CONSOLE_FILE_LOGGER.path
-            if not os.path.exists(path):
-                self.show_error_dialog("Log File Not Found", f"Log file does not exist: {path}")
-                return
-            system = platform.system()
-            if system == 'Darwin':
-                subprocess.run(['open', path])
-            elif system == 'Windows':
-                subprocess.run(['cmd', '/c', 'start', '', path])
-            else:
-                subprocess.run(['xdg-open', path])
+            # Delegate to helper that ensures the file exists and opens it
+            open_console_log_file(CONSOLE_FILE_LOGGER.path)
         except Exception as e:
-            self.show_error_dialog("Open Log Error", f"Failed to open log file: {e}")
+            try:
+                self.show_error_dialog("Open Log Error", f"Failed to open log file: {e}")
+            except Exception:
+                pass
             try:
                 import logging
                 logging.error(f"Open log failed: {e}")
