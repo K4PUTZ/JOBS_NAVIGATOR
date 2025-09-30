@@ -66,8 +66,8 @@ class WelcomeWindow(tk.Toplevel):
         try:
             self.update_idletasks()
             # Determine required space; enforce a stable baseline height for tallest page
-            req_w = max(640, self._root.winfo_reqwidth(), self.winfo_width())
-            req_h = max(600, self._root.winfo_reqheight(), self.winfo_height())
+            req_w = max(640, self._root_frame.winfo_reqwidth(), self.winfo_width())
+            req_h = max(600, self._root_frame.winfo_reqheight(), self.winfo_height())
             self.minsize(req_w, req_h)
             self.geometry(f"{req_w}x{req_h}")
         except Exception:
@@ -85,11 +85,11 @@ class WelcomeWindow(tk.Toplevel):
 
     # ---------- UI Construction ----------
     def _build_ui(self) -> None:
-        root = ttk.Frame(self, padding=14)
-        root.pack(fill='both', expand=True)
-        self._root = root
+        root_frame = ttk.Frame(self, padding=14)
+        root_frame.pack(fill='both', expand=True)
+        self._root_frame = root_frame
 
-        content = ttk.Frame(root)
+        content = ttk.Frame(root_frame)
         content.pack(fill='both', expand=True)
         for _ in range(2):
             ttk.Frame(content, height=8).pack(fill='x')
@@ -97,11 +97,11 @@ class WelcomeWindow(tk.Toplevel):
         self._img_label.pack(pady=(0, 8))
         self._text_label = ttk.Label(content, text='', wraplength=420, justify='center')
         self._text_label.pack(pady=(0, 8))
-        ttk.Separator(root, orient='horizontal').pack(fill='x', padx=8, pady=(4, 4))
-        self._extra_frame = ttk.Frame(root)
+        ttk.Separator(root_frame, orient='horizontal').pack(fill='x', padx=8, pady=(4, 4))
+        self._extra_frame = ttk.Frame(root_frame)
         self._extra_frame.pack(fill='x')
 
-        nav = ttk.Frame(root)
+        nav = ttk.Frame(root_frame)
         nav.pack(fill='x', pady=(4, 0))
         self._btn_prev = ttk.Button(nav, text='Previous', command=self._go_prev)
         self._btn_prev.pack(side='left')

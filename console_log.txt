@@ -1,16 +1,8 @@
-[22:02:20] [ACCOUNT] Authenticated account: (signed out)
-
 ======== 2025-09-29 - Monday ========
-[13:28:12] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[13:28:16] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[13:28:16] [SKU] Detected SKU: WEEKENDINTAIPEI_SOFA_20241031_5069
-[13:41:57] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[13:41:57] [SKU] Detected SKU: ARCADIAN_SOFA_20240523_4838
-[14:13:15] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[14:13:23] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[14:13:23] [SKU] Detected SKU: WEEKENDINTAIPEI_SOFA_20241031_5069
-[15:47:14] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[16:05:53] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[16:29:04] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[16:29:42] [ACCOUNT] Authenticated account: mateus@sofadigital.com
-[16:55:23] [ERROR] welcome_window.error (error=WelcomeWindow.__init__() takes 2 positional arguments but 3 were given)
+[17:07:04] [ERROR] welcome_window.error (error=WelcomeWindow.__init__() takes 2 positional arguments but 3 were given)
+[17:11:02] [ERROR] welcome_window.error (error=WelcomeWindow.__init__() takes 2 positional arguments but 3 were given)
+[17:12:12] [ERROR] welcome_window.error (error=WelcomeWindow.__init__() takes 2 positional arguments but 3 were given)
+[17:12:46] [ERROR] welcome_window.error (error=WelcomeWindow.__init__() takes 2 positional arguments but 3 were given)
+[20:46:06] [ERROR] Auth failed: (access_denied) 
+[20:46:06] [ERROR] auth.failed (error=(access_denied) )
+[20:47:09] [ACCOUNT] Authenticated account: mateus@sofadigital.com (session 14)

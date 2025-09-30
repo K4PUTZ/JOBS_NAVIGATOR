@@ -35,11 +35,6 @@ from platformdirs import user_log_path
 def run() -> None:
     settings_manager = SettingsManager()
     settings = settings_manager.load()
-    # First session if counter is 0
-    try:
-        first_session = bool(getattr(settings, 'session_count', 0) == 0)
-    except Exception:
-        first_session = False
     recent_history = RecentSKUHistory(settings)
     last_sku: str | None = None
 
@@ -74,6 +69,8 @@ def run() -> None:
     except Exception:
         pass
     current_account: str | None = None
+    # Keep a single Welcome window instance alive (avoid duplicates from multiple schedulers)
+    welcome_window_ref: tk.Toplevel | None = None
 
     def update_account_label(account: str | None) -> None:
         nonlocal current_account
@@ -416,7 +413,17 @@ def run() -> None:
 
     def on_help_action() -> None:
         try:
-            WelcomeWindow(
+            nonlocal welcome_window_ref
+            # If already open, just focus it
+            if welcome_window_ref is not None:
+                try:
+                    if int(welcome_window_ref.winfo_exists()):
+                        welcome_window_ref.lift(); welcome_window_ref.focus_set()
+                        return
+                except Exception:
+                    welcome_window_ref = None
+
+            win = WelcomeWindow(
                 root,
                 settings=settings,
                 on_auth_connect=handle_auth_connect,
@@ -424,6 +431,14 @@ def run() -> None:
                 is_connected=is_connected,
                 save_settings=save_settings_callback,
             )
+            welcome_window_ref = win
+            try:
+                def _clear_ref(_e=None):
+                    nonlocal welcome_window_ref
+                    welcome_window_ref = None
+                win.bind('<Destroy>', _clear_ref)
+            except Exception:
+                pass
         except Exception:
             # Help dialog failed to open - fail silently
             pass
@@ -835,17 +850,50 @@ def run() -> None:
     # - user is not connected
     # - suppression flag is not enabled
     def _maybe_prompt_setup() -> None:
-        # Show Welcome Window on first run (when show_help_on_startup is True)
-        if getattr(settings, 'show_help_on_startup', True):
+        # Show Welcome Window when the setting is enabled
+        if bool(getattr(settings, 'show_help_on_startup', True)):
             try:
-                welcome = WelcomeWindow(root, settings)
-                root.wait_window(welcome)
+                LOGGER.info('welcome_window.scheduled')
+                nonlocal welcome_window_ref
+                # If already open (from previous scheduler or manual action), just focus it
+                try:
+                    if welcome_window_ref is not None and int(welcome_window_ref.winfo_exists()):
+                        welcome_window_ref.lift(); welcome_window_ref.focus_set()
+                        return
+                except Exception:
+                    welcome_window_ref = None
+
+                welcome = WelcomeWindow(
+                    root,
+                    settings=settings,
+                    on_auth_connect=handle_auth_connect,
+                    on_open_settings=on_open_settings,
+                    is_connected=is_connected,
+                    save_settings=save_settings_callback,
+                )
+                welcome_window_ref = welcome
+                try:
+                    welcome.lift(); welcome.focus_set()
+                except Exception:
+                    pass
+                # Do not block startup on the Welcome window.
+                # Some environments (tests/headless or auto-quit) can hang when waiting.
+                try:
+                    def _on_close(_e=None):
+                        nonlocal welcome_window_ref
+                        welcome_window_ref = None
+                        LOGGER.info('welcome_window.closed')
+                    welcome.bind('<Destroy>', _on_close)
+                except Exception:
+                    pass
             except Exception as e:
                 LOGGER.error('welcome_window.error', error=str(e))
                 # Continue silently if Welcome Window fails
 
     try:
-        root.after(300 if first_session else 500, _maybe_prompt_setup)
+        # Schedule both after idle and after a short delay for reliability
+        root.after_idle(_maybe_prompt_setup)
+        root.after(500, _maybe_prompt_setup)
     except Exception:
         pass
 

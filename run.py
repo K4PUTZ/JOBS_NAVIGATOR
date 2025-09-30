@@ -43,18 +43,41 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _maybe_auto_quit(root: tk.Tk, cli_ms: int | None) -> None:
-    # Priority: CLI flag > env var
-    env_ms = os.getenv("SJN_AUTO_QUIT_MS")
+    """Optionally schedule an auto-quit timer for test runs.
+
+    If the user interacts with the UI (keyboard/mouse), cancel the timer to
+    avoid surprising exits during manual use.
+    """
+    # Priority: explicit CLI flag. Only honour env var in CI/pytest contexts
+    env_ms = None
+    if cli_ms is None and (os.getenv("PYTEST_CURRENT_TEST") or os.getenv("CI")):
+        env_ms = os.getenv("SJN_AUTO_QUIT_MS")
     try:
         env_val = int(env_ms) if env_ms is not None else None
     except ValueError:
         env_val = None
     delay = cli_ms if cli_ms is not None else env_val
-    if delay and delay > 0:
-        try:
-            root.after(delay, lambda: root.quit())
-        except Exception:
-            pass
+    if not delay or delay <= 0:
+        return
+    try:
+        after_id = root.after(delay, lambda: root.quit())
+        # Cancel on first user interaction
+        def _cancel(_e=None):
+            try:
+                root.after_cancel(after_id)
+            except Exception:
+                pass
+            try:
+                root.unbind_all('<Any-KeyPress>')
+                root.unbind_all('<Any-Button>')
+                root.unbind_all('<Motion>')
+            except Exception:
+                pass
+        root.bind_all('<Any-KeyPress>', _cancel, add=True)
+        root.bind_all('<Any-Button>', _cancel, add=True)
+        root.bind_all('<Motion>', _cancel, add=True)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
