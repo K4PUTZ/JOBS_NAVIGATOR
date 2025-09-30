@@ -13,3 +13,4 @@
 [16:05:53] [ACCOUNT] Authenticated account: mateus@sofadigital.com
 [16:29:04] [ACCOUNT] Authenticated account: mateus@sofadigital.com
 [16:29:42] [ACCOUNT] Authenticated account: mateus@sofadigital.com
+[16:55:23] [ERROR] welcome_window.error (error=WelcomeWindow.__init__() takes 2 positional arguments but 3 were given)

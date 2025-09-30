@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Optional
 
 from platformdirs import user_log_path
+try:
+    # Mirror errors to the plain console log for visibility
+    from .console_file import CONSOLE_FILE_LOGGER
+except Exception:  # pragma: no cover - optional import safeguard
+    CONSOLE_FILE_LOGGER = None  # type: ignore
 
 from ..config.flags import FlagSet, FLAGS
 
@@ -34,6 +39,18 @@ class EventLogger:
 
     def error(self, message: str, **extra) -> None:
         self._logger.error(message, extra={"extra_data": extra})
+        # Also mirror to console log for quick visibility
+        try:
+            if CONSOLE_FILE_LOGGER is not None:
+                # Include minimal extra info inline if present
+                if extra:
+                    flat = ", ".join(f"{k}={v}" for k, v in extra.items())
+                    CONSOLE_FILE_LOGGER.log_error(f"{message} ({flat})")
+                else:
+                    CONSOLE_FILE_LOGGER.log_error(message)
+        except Exception:
+            # Never let logging cause crashes
+            pass
 
     def debug(self, message: str, **extra) -> None:
         if not self._flags.verbose_logging:

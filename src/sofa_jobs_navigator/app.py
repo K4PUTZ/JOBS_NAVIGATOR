@@ -79,7 +79,13 @@ def run() -> None:
         nonlocal current_account
         current_account = account
         try:
-            CONSOLE_FILE_LOGGER.log_account(account)
+            # Include session number in the console log (one account entry per day)
+            sess = None
+            try:
+                sess = int(getattr(settings, 'session_count', 0) or 0)
+            except Exception:
+                sess = None
+            CONSOLE_FILE_LOGGER.log_account(account, session=sess)
         except Exception:
             pass
 
