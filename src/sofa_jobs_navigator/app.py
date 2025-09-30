@@ -72,6 +72,33 @@ def run() -> None:
     # Keep a single Welcome window instance alive (avoid duplicates from multiple schedulers)
     welcome_window_ref: tk.Toplevel | None = None
 
+    def _bring_app_to_front(win: tk.Misc) -> None:
+        """Raise and focus the main window even when launched from IDEs.
+
+        Uses a short, temporary topmost toggle so the window reliably comes
+        to the foreground on macOS/Windows without staying always-on-top.
+        """
+        try:
+            win.update_idletasks()
+            try:
+                win.deiconify()
+            except Exception:
+                pass
+            win.lift()
+            try:
+                win.focus_force()
+            except Exception:
+                # focus_force can fail under some WMs; ignore
+                pass
+            # Topmost dance
+            try:
+                win.attributes('-topmost', True)
+                win.after(250, lambda: win.attributes('-topmost', False))
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     def update_account_label(account: str | None) -> None:
         nonlocal current_account
         current_account = account
@@ -562,6 +589,12 @@ def run() -> None:
         pass
     main_window.console_hint('Copy a SKU (Vendor-ID) to the memory and click search or press F12.')
     main_window.update_recents(recent_history.items())
+    # Ensure the main window gains focus even when Welcome is disabled
+    try:
+        _bring_app_to_front(root)
+        root.after(350, lambda: _bring_app_to_front(root))
+    except Exception:
+        pass
     # No auto-opening Help on startup.
 
     hotkeys = HotkeyManager(root=root)
@@ -615,103 +648,22 @@ def run() -> None:
             LOGGER.info('auth.auto_connect_failed')
 
     def _startup_auth_flow() -> None:
-        """Startup credential check/prompt before attempting auto-connect.
+        """Startup auto-connect if the user opted in.
 
-        Behavior:
+        - No prompts here; the Welcome window provides guidance.
         - If offline mode: do nothing.
-        - If valid cached credentials and user enabled auto-connect: connect automatically.
-        - If no valid credentials: prompt user to connect now. On decline, warn in console.
+        - If `connect_on_startup` is True: attempt auto-connect and post-connect clipboard scan.
         """
         if FLAGS.offline_mode:
             return
-        # If user opted in to auto-connect, attempt it regardless of cached state
         try:
             if bool(getattr(settings, 'connect_on_startup', False)):
                 _attempt_auto_connect()
                 return
         except Exception:
             pass
-        # Otherwise, optionally prompt (disabled by default)
-        try:
-            prompt_enabled = bool(getattr(settings, 'prompt_for_connect_on_startup', False))
-        except Exception:
-            prompt_enabled = True
-        if prompt_enabled:
-            ok, set_auto = _ask_connect_prompt_with_autocheck(root)
-            if set_auto:
-                try:
-                    settings.connect_on_startup = True
-                    settings.prompt_for_connect_on_startup = False
-                    settings_manager.save(settings)
-                except Exception:
-                    pass
-        else:
-            ok = False
-        if ok:
-            try:
-                # Close any transient/top-level dialogs (Welcome / Settings) so the
-                # browser-based auth flow's local server can open a browser tab
-                # without being obscured by modal windows.
-                try:
-                    # Release any grab (modal dialogues may have a grab) so destroy can proceed
-                    try:
-                        root.grab_release()
-                    except Exception:
-                        pass
-
-                    # Withdraw then destroy Toplevels to remove them from the window manager
-                    for w in list(root.winfo_children()):
-                        try:
-                            if isinstance(w, tk.Toplevel):
-                                try:
-                                    w.withdraw()
-                                except Exception:
-                                    pass
-                                try:
-                                    w.update_idletasks()
-                                except Exception:
-                                    pass
-                                try:
-                                    w.destroy()
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-                # Ensure window manager processes the changes and give a slightly
-                # longer pause so the browser tab won't be obscured.
-                try:
-                    root.update()
-                    import time
-
-                    time.sleep(0.2)
-                    root.update()
-                except Exception:
-                    pass
-
-                creds = auth_service.ensure_authenticated()
-                email = auth_service.get_account_email(creds) or getattr(creds, 'service_account_email', None) or getattr(creds, 'client_id', None)
-                update_account_label(email)
-                drive_client._service_factory = lambda: GoogleDriveService(creds)  # type: ignore[attr-defined]
-                main_window.console_success('Connected to Google Drive.')
-                try:
-                    expiry = auth_service.get_token_expiry_iso(creds)
-                    main_window.set_status(online=True, account=email, token_expiry_iso=expiry)
-                except Exception:
-                    pass
-                LOGGER.info('auth.connected.startup_prompt', account=email)
-                try:
-                    if bool(getattr(settings, 'auto_search_clipboard_after_connect', False)):
-                        _post_connect_clipboard_scan()
-                except Exception:
-                    pass
-            except Exception as exc:
-                main_window.console_error(f'Auth failed: {exc}')
-                LOGGER.error('auth.failed.startup_prompt', error=str(exc))
-        else:
-            main_window.console_warning('Not connected. Press F11 to connect to Google Drive.')
-            LOGGER.info('auth.startup_user_declined')
+        # No auto-connect and no prompt
+        LOGGER.info('auth.startup_no_autoconnect')
 
     try:
         # Schedule startup auth decision flow (includes optional auto-connect)
@@ -910,75 +862,7 @@ def run() -> None:
 # =================== END APPLICATION BOOT ===================
 
 
-def _ask_connect_prompt_with_autocheck(parent: tk.Misc) -> tuple[bool, bool]:
-    """Modal prompt asking to connect now, with an 'Auto-connect on startup' checkbox.
-
-    Returns (do_connect, auto_connect_on_startup).
-    """
-    win = tk.Toplevel(parent)
-    try:
-        win.title('Connect to Google Drive?')
-        win.transient(parent)
-        win.grab_set()
-        win.resizable(False, False)
-    except Exception:
-        pass
-
-    res = {'ok': False, 'auto': False}
-
-    frame = ttk.Frame(win, padding=12)
-    frame.pack(fill='both', expand=True)
-    ttk.Label(frame, text='You are not connected to Google Drive yet. Connect now?').pack(anchor='w')
-    ttk.Frame(frame, height=8).pack(fill='x')
-    auto_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(frame, text='Auto-connect on startup', variable=auto_var).pack(anchor='w')
-
-    btns = ttk.Frame(frame)
-    btns.pack(fill='x', pady=(12, 0))
-
-    def _ok() -> None:
-        res['ok'] = True
-        res['auto'] = bool(auto_var.get())
-        try:
-            win.destroy()
-        except Exception:
-            pass
-
-    def _cancel() -> None:
-        res['ok'] = False
-        res['auto'] = bool(auto_var.get())
-        try:
-            win.destroy()
-        except Exception:
-            pass
-
-    ttk.Button(btns, text='Connect', command=_ok).pack(side='right')
-    ttk.Button(btns, text='Not now', command=_cancel).pack(side='right', padx=(0, 6))
-
-    # Center over parent
-    try:
-        win.update_idletasks()
-        px = parent.winfo_rootx(); py = parent.winfo_rooty()
-        pw = parent.winfo_width() or parent.winfo_reqwidth()
-        ph = parent.winfo_height() or parent.winfo_reqheight()
-        w = win.winfo_width() or win.winfo_reqwidth()
-        h = win.winfo_height() or win.winfo_reqheight()
-        x = px + max((pw - w)//2, 0)
-        y = py + max((ph - h)//2, 0)
-        win.geometry(f"{w}x{h}+{x}+{y}")
-    except Exception:
-        pass
-
-    try:
-        win.bind('<Escape>', lambda e: _cancel())
-    except Exception:
-        pass
-
-    try:
-        parent.wait_window(win)
-    except Exception:
-        pass
-    return bool(res['ok']), bool(res['auto'])
+#
 
 
 if __name__ == '__main__':

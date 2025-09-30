@@ -92,27 +92,7 @@ class SettingsDialog(tk.Toplevel):
         _cb_connect = ttk.Checkbutton(conn_row, variable=self._connect_start_var)
         _cb_connect.pack(side='left', padx=(0, 6))
         ttk.Label(conn_row, text='Connect on Startup.').pack(side='left')
-        # 3) Prompt to connect on Startup when not connected
-        prompt_row = ttk.Frame(header)
-        prompt_row.pack(anchor='w', pady=(2, 2))
-        self._prompt_connect_var = tk.BooleanVar(value=bool(getattr(self._settings, 'prompt_for_connect_on_startup', True)))
-        _cb_prompt_connect = ttk.Checkbutton(prompt_row, variable=self._prompt_connect_var)
-        _cb_prompt_connect.pack(side='left', padx=(0, 6))
-        ttk.Label(prompt_row, text='Prompt to connect on Startup.').pack(side='left')
-        # Disable prompt option when auto-connect is enabled
-        def _sync_prompt_state(*_a):
-            try:
-                if bool(self._connect_start_var.get()):
-                    _cb_prompt_connect.state(['disabled'])
-                else:
-                    _cb_prompt_connect.state(['!disabled'])
-            except Exception:
-                pass
-        try:
-            _sync_prompt_state()
-            self._connect_start_var.trace_add('write', lambda *_: _sync_prompt_state())
-        except Exception:
-            pass
+        # Prompt option removed; the Welcome window provides startup guidance.
         # 4) Auto-search clipboard after connecting on startup
         auto_row = ttk.Frame(header)
         auto_row.pack(anchor='w', pady=(2, 2))
@@ -294,7 +274,7 @@ class SettingsDialog(tk.Toplevel):
             save_recent_skus=self._settings.save_recent_skus,
             sounds_enabled=bool(self._sounds_var.get()) if hasattr(self, '_sounds_var') else self._settings.sounds_enabled,
             connect_on_startup=bool(self._connect_start_var.get()) if hasattr(self, '_connect_start_var') else getattr(self._settings, 'connect_on_startup', False),
-            prompt_for_connect_on_startup=bool(self._prompt_connect_var.get()) if hasattr(self, '_prompt_connect_var') else getattr(self._settings, 'prompt_for_connect_on_startup', True),
+            
             auto_search_clipboard_after_connect=bool(self._auto_search_after_var.get()) if hasattr(self, '_auto_search_after_var') else getattr(self._settings, 'auto_search_clipboard_after_connect', False),
             auto_load_multi_skus_without_prompt=bool(self._auto_load_multi_var.get()) if hasattr(self, '_auto_load_multi_var') else getattr(self._settings, 'auto_load_multi_skus_without_prompt', False),
             open_root_on_sku_found=bool(self._open_root_var.get()) if hasattr(self, '_open_root_var') else getattr(self._settings, 'open_root_on_sku_found', False),
@@ -302,9 +282,7 @@ class SettingsDialog(tk.Toplevel):
             default_suffix=getattr(self._settings, 'default_suffix', ' - FTR '),
             show_help_on_startup=bool(self._show_welcome_var.get()) if hasattr(self, '_show_welcome_var') else getattr(self._settings, 'show_help_on_startup', True),
         )
-        # If auto-connect is enabled, suppress future startup prompts automatically
-        if updated.connect_on_startup:
-            updated.prompt_for_connect_on_startup = False
+        # No prompt flag anymore
         self._on_save(updated)
         self.destroy()
 

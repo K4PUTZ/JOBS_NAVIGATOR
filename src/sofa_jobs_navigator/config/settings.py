@@ -32,9 +32,6 @@ class Settings:
     save_recent_skus: bool = True
     sounds_enabled: bool = True
     connect_on_startup: bool = False
-    # If True, show a connect prompt when no valid credentials exist at startup (unless offline)
-    # Default is False for a calmer first experience; we suggest enabling auto-connect later.
-    prompt_for_connect_on_startup: bool = False
     # If True, after a successful startup connect (auto or prompted) perform a clipboard SKU auto-search
     # Default True to speed up first actions after connect.
     auto_search_clipboard_after_connect: bool = True
@@ -72,7 +69,6 @@ class SettingsManager:
             save_recent_skus=raw.get('save_recent_skus', True),
             sounds_enabled=raw.get('sounds_enabled', True),
             connect_on_startup=raw.get('connect_on_startup', False),
-            prompt_for_connect_on_startup=raw.get('prompt_for_connect_on_startup', False),
             auto_search_clipboard_after_connect=raw.get('auto_search_clipboard_after_connect', True),
             auto_load_multi_skus_without_prompt=raw.get('auto_load_multi_skus_without_prompt', False),
             open_root_on_sku_found=raw.get('open_root_on_sku_found', False),
@@ -92,7 +88,6 @@ class SettingsManager:
             'save_recent_skus': settings.save_recent_skus,
             'sounds_enabled': settings.sounds_enabled,
             'connect_on_startup': settings.connect_on_startup,
-            'prompt_for_connect_on_startup': getattr(settings, 'prompt_for_connect_on_startup', True),
             'auto_search_clipboard_after_connect': getattr(settings, 'auto_search_clipboard_after_connect', False),
             'auto_load_multi_skus_without_prompt': getattr(settings, 'auto_load_multi_skus_without_prompt', False),
             'open_root_on_sku_found': getattr(settings, 'open_root_on_sku_found', False),

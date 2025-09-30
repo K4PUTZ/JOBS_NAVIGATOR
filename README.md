@@ -3,6 +3,7 @@
 Lightweight desktop helper to jump between Google Drive SKU folders. Copy any text that contains a SKU, press `F12`, and pick from configurable favorites – the app resolves the matching Drive path, logs the activity, and optionally plays feedback sounds.
 
 ## Features
+- Welcome window acts as the startup prompt; no separate connect prompt on launch. If not connected, the first search (F12) triggers Google sign-in automatically.
 - Cross-platform (macOS, Linux, Windows) Tkinter UI with console log, favorites, and recent SKU list
 - Modular architecture (reusable SKU detector, Drive client, clipboard reader, sound player)
 - Configurable favorites and preferences stored per user with dry-run/testing flags
@@ -44,11 +45,12 @@ JOBS NAVIGATOR/
    pip install -e .[test]
    ```
 2. Populate `src/sofa_jobs_navigator/config/reference_data.py` with your OAuth client values (`CREDENTIALS_TEMPLATE`).
-3. Launch the tool:
+3. Launch the tool (Auto-connect optional):
    ```bash
    python -m sofa_jobs_navigator.app
    ```
-4. Open **Settings → Connect / Refresh** to complete Google Drive sign-in (tokens are cached under your user config directory).
+4. To connect: open **Settings → Connect / Refresh** or just press F12 to search — if not connected, the Google sign-in flow starts automatically. Tokens are cached under your user config directory.
+5. You can enable **Connect on Startup** in Settings; otherwise, the app won't prompt on launch.
 
 ## Tests
 Execute the automated suite once dependencies are installed:

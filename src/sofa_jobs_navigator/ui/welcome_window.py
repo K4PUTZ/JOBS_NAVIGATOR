@@ -244,11 +244,6 @@ class WelcomeWindow(tk.Toplevel):
                 # Page 1: Connect on Startup (and suppress prompts when enabled)
                 if hasattr(self, '_connect_var'):
                     self._settings.connect_on_startup = bool(self._connect_var.get())
-                    try:
-                        if self._settings.connect_on_startup and hasattr(self._settings, 'prompt_for_connect_on_startup'):
-                            self._settings.prompt_for_connect_on_startup = False
-                    except Exception:
-                        pass
                 # Page 2: Auto-search clipboard after connect  
                 if hasattr(self, '_auto_search_after_var'):
                     self._settings.auto_search_clipboard_after_connect = bool(self._auto_search_after_var.get())
